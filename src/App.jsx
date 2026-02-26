@@ -787,7 +787,8 @@ function LoginScreen({ onLogin }) {
 
   return (
     <div style={{ minHeight: "100vh", background: "#F9FAFB", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', system-ui, sans-serif", padding: 20 }}>
-      {/* Logo */}
+
+    {/* Logo */}
       <div style={{ marginBottom: 32, textAlign: "center" }}>
         <div style={{ width: 64, height: 64, borderRadius: 20, background: "#DC2626", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, margin: "0 auto 12px", boxShadow: "0 8px 24px rgba(220,38,38,0.3)" }}>🏍️</div>
         <div style={{ fontSize: 32, fontWeight: 900, color: "#DC2626", letterSpacing: "-1px" }}>Baruk</div>
@@ -969,7 +970,7 @@ export default function App() {
 
   // ── Route by role ──
   return (
-    <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", background: "#F1F5F9", minHeight: "100vh" }}>
+    <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", background: "#F1F5F9", minHeight: "100vh", minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
       <TopBar />
       {user.role === "customer" && <CustomerApp packages={packages.filter(p => p.customerId === user.id)} onCreatePackage={onCreatePackage} transitLogs={logs} />}
       {user.role === "rider"    && <RiderApp packages={packages} onAcceptCollection={onAcceptCollection} onMarkAtWarehouse={onMarkAtWarehouse} onAcceptDelivery={onAcceptDelivery} onVerifyOTP={onVerifyOTP} onMarkDelivered={onMarkDelivered} transitLogs={logs} currentRider={user} />}
