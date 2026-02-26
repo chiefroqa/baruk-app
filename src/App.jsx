@@ -378,8 +378,8 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
 // ============================================================
 // RIDER APP
 // ============================================================
-function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onAcceptDelivery, onVerifyOTP, onMarkDelivered, transitLogs }) {
-  const rider = RIDERS[0]; // Logged in as Kip Mutai, Westlands
+function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onAcceptDelivery, onVerifyOTP, onMarkDelivered, transitLogs, currentRider }) {
+  const rider = currentRider || RIDERS[0];
   const [feed, setFeed] = useState("collection");
   const [otpInput, setOtpInput] = useState({});
   const [otpError, setOtpError] = useState({});
@@ -750,12 +750,133 @@ function AdminDashboard({ packages, riders, transitLogs, onDispatch, onVerifyWar
 }
 
 // ============================================================
-// MAIN APP — STATE ENGINE + ROUTING
+// MOCK USER ACCOUNTS (replace with Supabase Auth later)
+// ============================================================
+const MOCK_ACCOUNTS = [
+  { id: "cust-current", email: "customer@baruk.co", password: "customer123", role: "customer", name: "Amara Osei" },
+  { id: "rider-01",     email: "kip@baruk.co",      password: "rider123",    role: "rider",    name: "Kip Mutai",      zone: "Westlands" },
+  { id: "rider-02",     email: "faith@baruk.co",    password: "rider123",    role: "rider",    name: "Faith Wanjiru",  zone: "Ngong" },
+  { id: "admin-01",     email: "admin@baruk.co",    password: "admin123",    role: "admin",    name: "Hub Admin" },
+];
+
+// ============================================================
+// LOGIN SCREEN
+// ============================================================
+function LoginScreen({ onLogin }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = () => {
+    setError("");
+    setLoading(true);
+    setTimeout(() => {
+      const user = MOCK_ACCOUNTS.find(a => a.email === email.trim().toLowerCase() && a.password === password);
+      if (user) {
+        onLogin(user);
+      } else {
+        setError("Incorrect email or password. Please try again.");
+      }
+      setLoading(false);
+    }, 800);
+  };
+
+  const handleKeyDown = (e) => { if (e.key === "Enter") handleLogin(); };
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#F9FAFB", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', system-ui, sans-serif", padding: 20 }}>
+      {/* Logo */}
+      <div style={{ marginBottom: 32, textAlign: "center" }}>
+        <div style={{ width: 64, height: 64, borderRadius: 20, background: "#DC2626", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, margin: "0 auto 12px", boxShadow: "0 8px 24px rgba(220,38,38,0.3)" }}>🏍️</div>
+        <div style={{ fontSize: 32, fontWeight: 900, color: "#DC2626", letterSpacing: "-1px" }}>Baruk</div>
+        <div style={{ fontSize: 14, color: "#9CA3AF", marginTop: 4 }}>Fast. Reliable. Trackable.</div>
+      </div>
+
+      {/* Card */}
+      <div style={{ width: "100%", maxWidth: 400, background: "#fff", borderRadius: 20, padding: 32, boxShadow: "0 4px 32px rgba(0,0,0,0.08)" }}>
+        <div style={{ fontSize: 20, fontWeight: 900, color: "#111827", marginBottom: 6 }}>Welcome back</div>
+        <div style={{ fontSize: 14, color: "#6B7280", marginBottom: 28 }}>Sign in to your Baruk account</div>
+
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#6B7280", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>Email</div>
+          <input
+            type="email" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={handleKeyDown}
+            placeholder="you@example.com"
+            style={{ width: "100%", padding: "12px 14px", border: "1.5px solid #E5E7EB", borderRadius: 10, fontSize: 14, fontFamily: "inherit", boxSizing: "border-box", outline: "none", transition: "border 0.15s" }}
+            onFocus={e => e.target.style.borderColor = "#DC2626"}
+            onBlur={e => e.target.style.borderColor = "#E5E7EB"}
+          />
+        </div>
+
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#6B7280", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>Password</div>
+          <div style={{ position: "relative" }}>
+            <input
+              type={showPassword ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)} onKeyDown={handleKeyDown}
+              placeholder="••••••••"
+              style={{ width: "100%", padding: "12px 44px 12px 14px", border: "1.5px solid #E5E7EB", borderRadius: 10, fontSize: 14, fontFamily: "inherit", boxSizing: "border-box", outline: "none", transition: "border 0.15s" }}
+              onFocus={e => e.target.style.borderColor = "#DC2626"}
+              onBlur={e => e.target.style.borderColor = "#E5E7EB"}
+            />
+            <button onClick={() => setShowPassword(s => !s)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "#9CA3AF" }}>
+              {showPassword ? "🙈" : "👁️"}
+            </button>
+          </div>
+        </div>
+
+        {error && (
+          <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#DC2626", fontWeight: 600, marginBottom: 16 }}>
+            ⚠️ {error}
+          </div>
+        )}
+
+        <button
+          onClick={handleLogin} disabled={loading || !email || !password}
+          style={{ width: "100%", padding: "13px", background: loading || !email || !password ? "#FCA5A5" : "#DC2626", color: "#fff", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 800, cursor: loading || !email || !password ? "not-allowed" : "pointer", fontFamily: "inherit", marginTop: 8, transition: "background 0.15s", boxShadow: "0 2px 12px rgba(220,38,38,0.25)" }}
+        >
+          {loading ? "Signing in..." : "Sign In"}
+        </button>
+
+        {/* Demo hint */}
+        <div style={{ marginTop: 28, padding: 16, background: "#F9FAFB", borderRadius: 12, border: "1px dashed #E5E7EB" }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Demo Accounts</div>
+          {[
+            { role: "Customer", email: "customer@baruk.co", password: "customer123", icon: "📦" },
+            { role: "Rider",    email: "kip@baruk.co",      password: "rider123",    icon: "🏍️" },
+            { role: "Admin",    email: "admin@baruk.co",    password: "admin123",    icon: "🏭" },
+          ].map(a => (
+            <div key={a.role}
+              onClick={() => { setEmail(a.email); setPassword(a.password); setError(""); }}
+              style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, cursor: "pointer", marginBottom: 4, transition: "background 0.1s" }}
+              onMouseEnter={e => e.currentTarget.style.background = "#F3F4F6"}
+              onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+            >
+              <span style={{ fontSize: 18 }}>{a.icon}</span>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#374151" }}>{a.role}</div>
+                <div style={{ fontSize: 11, color: "#9CA3AF" }}>{a.email}</div>
+              </div>
+              <div style={{ marginLeft: "auto", fontSize: 11, color: "#DC2626", fontWeight: 700 }}>Click to fill</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// MAIN APP — AUTH + STATE ENGINE + ROLE-BASED ROUTING
 // ============================================================
 export default function App() {
+  const [user, setUser] = useState(null);
   const [packages, setPackages] = useState(initialPackages);
   const [logs, setLogs] = useState(initialLogs);
-  const [activeView, setActiveView] = useState("customer");
+
+  const handleLogin = (u) => setUser(u);
+  const handleLogout = () => setUser(null);
 
   const addLog = (packageId, actorId, actorRole, actorName, event, location, notes = null) => {
     const log = { id: `log-${Date.now()}`, packageId, actorId, actorRole, actorName, event, location, notes, createdAt: new Date().toISOString() };
@@ -770,7 +891,7 @@ export default function App() {
   const onCreatePackage = (form) => {
     const { base, protectionFee, total, isHighValue } = calcFees(parseFloat(form.declaredValue) || 0);
     const pkg = {
-      id: `pkg-${Date.now()}`, trackingCode: generateTracking(), customerId: "cust-current", customerName: "You",
+      id: `pkg-${Date.now()}`, trackingCode: generateTracking(), customerId: user.id, customerName: user.name,
       riderCollectionId: null, riderDeliveryId: null,
       pickupAddress: form.pickupAddress, deliveryAddress: form.deliveryAddress,
       deliveryZone: form.deliveryZone, description: form.description, size: form.size,
@@ -781,7 +902,7 @@ export default function App() {
       createdAt: new Date().toISOString(),
     };
     setPackages(ps => [pkg, ...ps]);
-    addLog(pkg.id, "cust-current", "customer", "You", "ORDER_PLACED", pkg.pickupAddress, `Booking confirmed — KES ${pkg.total}`);
+    addLog(pkg.id, user.id, "customer", user.name, "ORDER_PLACED", pkg.pickupAddress, `Booking confirmed — KES ${pkg.total}`);
     return pkg;
   };
 
@@ -828,23 +949,31 @@ export default function App() {
     addLog(pkgId, riderId, "rider", rider?.name, "DELIVERED", pkg?.deliveryAddress, "Package delivered successfully");
   };
 
-  const views = { customer: "📱 Customer", rider: "🏍️ Rider", admin: "🏭 Admin" };
+  // ── Not logged in → show login screen ──
+  if (!user) return <LoginScreen onLogin={handleLogin} />;
 
+  // ── Shared top bar with user info + logout ──
+  const TopBar = () => (
+    <div style={{ background: "#111827", padding: "10px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, zIndex: 100 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#22C55E" }} />
+        <span style={{ fontSize: 13, color: "#D1D5DB", fontWeight: 600 }}>{user.name}</span>
+        <span style={{ fontSize: 11, background: "#374151", color: "#9CA3AF", padding: "2px 8px", borderRadius: 20, fontWeight: 700, textTransform: "uppercase" }}>{user.role}</span>
+        {user.zone && <span style={{ fontSize: 11, background: "#DC2626", color: "#fff", padding: "2px 8px", borderRadius: 20, fontWeight: 700 }}>📍 {user.zone}</span>}
+      </div>
+      <button onClick={handleLogout} style={{ background: "#374151", border: "none", color: "#9CA3AF", padding: "6px 14px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "inherit" }}>
+        Sign Out
+      </button>
+    </div>
+  );
+
+  // ── Route by role ──
   return (
-    <div style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif", background: "#F1F5F9", minHeight: "100vh" }}>
-      {/* View Switcher */}
-      <div style={{ background: "#111827", padding: "10px 16px", display: "flex", justifyContent: "center", gap: 8, position: "sticky", top: 0, zIndex: 100 }}>
-        <div style={{ fontSize: 11, color: "#6B7280", display: "flex", alignItems: "center", marginRight: 8 }}>SWITCH VIEW:</div>
-        {Object.entries(views).map(([v, l]) => (
-          <button key={v} onClick={() => setActiveView(v)} style={{ padding: "6px 18px", border: "none", background: activeView === v ? "#DC2626" : "#374151", color: activeView === v ? "#fff" : "#9CA3AF", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit", transition: "all 0.15s" }}>{l}</button>
-        ))}
-      </div>
-
-      <div style={{ padding: activeView === "admin" ? 0 : "0" }}>
-        {activeView === "customer" && <CustomerApp packages={packages} onCreatePackage={onCreatePackage} transitLogs={logs} />}
-        {activeView === "rider" && <RiderApp packages={packages} onAcceptCollection={onAcceptCollection} onMarkAtWarehouse={onMarkAtWarehouse} onAcceptDelivery={onAcceptDelivery} onVerifyOTP={onVerifyOTP} onMarkDelivered={onMarkDelivered} transitLogs={logs} />}
-        {activeView === "admin" && <AdminDashboard packages={packages} riders={RIDERS} transitLogs={logs} onDispatch={onDispatch} />}
-      </div>
+    <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", background: "#F1F5F9", minHeight: "100vh" }}>
+      <TopBar />
+      {user.role === "customer" && <CustomerApp packages={packages.filter(p => p.customerId === user.id)} onCreatePackage={onCreatePackage} transitLogs={logs} />}
+      {user.role === "rider"    && <RiderApp packages={packages} onAcceptCollection={onAcceptCollection} onMarkAtWarehouse={onMarkAtWarehouse} onAcceptDelivery={onAcceptDelivery} onVerifyOTP={onVerifyOTP} onMarkDelivered={onMarkDelivered} transitLogs={logs} currentRider={user} />}
+      {user.role === "admin"    && <AdminDashboard packages={packages} riders={RIDERS} transitLogs={logs} onDispatch={onDispatch} />}
     </div>
   );
 }
