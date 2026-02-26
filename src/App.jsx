@@ -515,10 +515,33 @@ function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onAcceptDel
 // ============================================================
 // ADMIN DASHBOARD
 // ============================================================
-function AdminDashboard({ packages, riders, transitLogs, onDispatch, onVerifyWarehouseOTP }) {
+function AdminDashboard({ packages, riders, transitLogs, onDispatch, onAddRider, accounts }) {
   const [view, setView] = useState("hub");
   const [selectedPkg, setSelectedPkg] = useState(null);
   const [selectedRider, setSelectedRider] = useState("");
+  const [showAddRider, setShowAddRider] = useState(false);
+  const [riderForm, setRiderForm] = useState({});
+  const [riderFormError, setRiderFormError] = useState("");
+  const [riderFormSuccess, setRiderFormSuccess] = useState("");
+
+  const handleAddRider = () => {
+    setRiderFormError(""); setRiderFormSuccess("");
+    const { name, email, phone, password, licenseNumber, zone } = riderForm;
+    if (!name || !email || !phone || !password || !licenseNumber || !zone)
+      return setRiderFormError("Please fill in all fields.");
+    if (accounts.find(a => a.email === email.trim().toLowerCase()))
+      return setRiderFormError("An account with this email already exists.");
+    const newRider = {
+      id: `rider-${Date.now()}`, role: "rider",
+      name: name.trim(), email: email.trim().toLowerCase(),
+      phone: phone.trim(), password, licenseNumber: licenseNumber.trim(),
+      zone: zone || ZONES[0],
+    };
+    onAddRider(newRider);
+    setRiderFormSuccess(`Rider account created for ${name}. They can now log in with ${email}.`);
+    setRiderForm({});
+    setTimeout(() => { setShowAddRider(false); setRiderFormSuccess(""); }, 3000);
+  };
   const [otpInput, setOtpInput] = useState("");
   const [otpError, setOtpError] = useState(false);
 
@@ -631,10 +654,67 @@ function AdminDashboard({ packages, riders, transitLogs, onDispatch, onVerifyWar
           </div>
         )}
 
+
         {view === "riders" && (
           <div>
-            <div style={{ fontSize: 18, fontWeight: 600, color: "#111827", marginBottom: 16 }}>Active Riders</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div style={{ fontSize: 18, fontWeight: 900, color: "#111827" }}>Riders ({riders.length})</div>
+              <Btn onClick={() => setShowAddRider(s => !s)} variant={showAddRider ? "ghost" : "primary"} size="sm">
+                {showAddRider ? "✕ Cancel" : "+ Add Rider"}
+              </Btn>
+            </div>
+
+            {/* Add Rider Form */}
+            {showAddRider && (
+              <Card style={{ marginBottom: 20, border: "1.5px solid #FECACA", background: "#FFF8F8" }}>
+                <div style={{ fontSize: 15, fontWeight: 900, color: "#111827", marginBottom: 16 }}>🏍️ Create Rider Account</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  {[
+                    { label: "Full Name",       key: "name",          placeholder: "e.g. John Kamau",        type: "text"     },
+                    { label: "Email",            key: "email",         placeholder: "rider@baruk.co",         type: "email"    },
+                    { label: "Phone Number",     key: "phone",         placeholder: "e.g. 0712 345 678",      type: "tel"      },
+                    { label: "ID / License No.", key: "licenseNumber", placeholder: "e.g. DL-2024-001",       type: "text"     },
+                    { label: "Password",         key: "password",      placeholder: "Set a login password",   type: "password" },
+                  ].map(f => (
+                    <div key={f.key} style={{ gridColumn: f.key === "name" ? "1 / -1" : undefined }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.06em" }}>{f.label}</div>
+                      <input
+                        type={f.type} value={riderForm[f.key] || ""} placeholder={f.placeholder}
+                        onChange={e => setRiderForm(rf => ({ ...rf, [f.key]: e.target.value }))}
+                        style={{ width: "100%", padding: "10px 12px", border: "1.5px solid #E5E7EB", borderRadius: 10, fontSize: 14, fontFamily: "inherit", boxSizing: "border-box", outline: "none", color: "#111827" }}
+                        onFocus={e => e.target.style.borderColor = "#DC2626"}
+                        onBlur={e => e.target.style.borderColor = "#E5E7EB"}
+                      />
+                    </div>
+                  ))}
+                  {/* Zone selector */}
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.06em" }}>Home Zone</div>
+                    <select value={riderForm.zone || ZONES[0]} onChange={e => setRiderForm(rf => ({ ...rf, zone: e.target.value }))}
+                      style={{ width: "100%", padding: "10px 12px", border: "1.5px solid #E5E7EB", borderRadius: 10, fontSize: 14, fontFamily: "inherit", color: "#111827" }}>
+                      {ZONES.map(z => <option key={z} value={z}>{z}</option>)}
+                    </select>
+                  </div>
+                </div>
+                {riderFormError && (
+                  <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#DC2626", fontWeight: 600, marginTop: 12 }}>
+                    ⚠️ {riderFormError}
+                  </div>
+                )}
+                {riderFormSuccess && (
+                  <div style={{ background: "#ECFDF5", border: "1px solid #6EE7B7", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#065F46", fontWeight: 600, marginTop: 12 }}>
+                    ✅ {riderFormSuccess}
+                  </div>
+                )}
+                <div style={{ marginTop: 16, display: "flex", gap: 10 }}>
+                  <Btn onClick={handleAddRider} variant="primary">Create Rider Account</Btn>
+                  <Btn onClick={() => { setShowAddRider(false); setRiderForm({}); setRiderFormError(""); setRiderFormSuccess(""); }} variant="ghost">Cancel</Btn>
+                </div>
+              </Card>
+            )}
+
+            {/* Rider cards */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
               {riders.map(rider => {
                 const myPkgs = packages.filter(p => p.riderCollectionId === rider.id || p.riderDeliveryId === rider.id);
                 const active = myPkgs.filter(p => p.status !== "delivered");
@@ -642,22 +722,23 @@ function AdminDashboard({ packages, riders, transitLogs, onDispatch, onVerifyWar
                   <Card key={rider.id}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
                       <div>
-                        <div style={{ fontWeight: 600, color: "#111827", fontSize: 15 }}>{rider.name}</div>
+                        <div style={{ fontWeight: 800, color: "#111827", fontSize: 15 }}>{rider.name}</div>
                         <div style={{ fontSize: 12, color: "#6B7280" }}>{rider.phone}</div>
+                        {rider.licenseNumber && <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 2 }}>🪪 {rider.licenseNumber}</div>}
                       </div>
-                      <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#FEF2F2", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>🏍️</div>
+                      <div style={{ width: 44, height: 44, borderRadius: "50%", background: "#FEF2F2", border: "1.5px solid #FECACA", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>🏍️</div>
                     </div>
                     <div style={{ background: "#F9FAFB", borderRadius: 10, padding: "10px 12px", marginBottom: 10 }}>
-                      <div style={{ fontSize: 12, color: "#6B7280" }}>Home Zone</div>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: "#DC2626" }}>{rider.zone}</div>
+                      <div style={{ fontSize: 11, color: "#6B7280", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>Home Zone</div>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: "#DC2626", marginTop: 2 }}>📍 {rider.zone}</div>
                     </div>
                     <div style={{ display: "flex", gap: 8 }}>
                       <div style={{ flex: 1, textAlign: "center", background: "#FEF2F2", borderRadius: 8, padding: "8px 4px" }}>
-                        <div style={{ fontSize: 20, fontWeight: 600, color: "#EF4444" }}>{active.length}</div>
+                        <div style={{ fontSize: 22, fontWeight: 900, color: "#EF4444" }}>{active.length}</div>
                         <div style={{ fontSize: 10, color: "#6B7280", fontWeight: 700 }}>ACTIVE</div>
                       </div>
                       <div style={{ flex: 1, textAlign: "center", background: "#ECFDF5", borderRadius: 8, padding: "8px 4px" }}>
-                        <div style={{ fontSize: 20, fontWeight: 600, color: "#10B981" }}>{myPkgs.filter(p => p.status === "delivered").length}</div>
+                        <div style={{ fontSize: 22, fontWeight: 900, color: "#10B981" }}>{myPkgs.filter(p => p.status === "delivered").length}</div>
                         <div style={{ fontSize: 10, color: "#6B7280", fontWeight: 700 }}>DONE</div>
                       </div>
                     </div>
@@ -667,7 +748,6 @@ function AdminDashboard({ packages, riders, transitLogs, onDispatch, onVerifyWar
             </div>
           </div>
         )}
-
         {view === "logs" && (
           <div>
             <div style={{ fontSize: 18, fontWeight: 600, color: "#111827", marginBottom: 16 }}>Chain of Custody Log</div>
@@ -750,118 +830,112 @@ function AdminDashboard({ packages, riders, transitLogs, onDispatch, onVerifyWar
 }
 
 // ============================================================
-// MOCK USER ACCOUNTS (replace with Supabase Auth later)
+// ACCOUNT STORE (replace with Supabase Auth later)
 // ============================================================
-const MOCK_ACCOUNTS = [
-  { id: "cust-current", email: "customer@baruk.co", password: "customer123", role: "customer", name: "Amara Osei" },
-  { id: "rider-01",     email: "kip@baruk.co",      password: "rider123",    role: "rider",    name: "Kip Mutai",      zone: "Westlands" },
-  { id: "rider-02",     email: "faith@baruk.co",    password: "rider123",    role: "rider",    name: "Faith Wanjiru",  zone: "Ngong" },
-  { id: "admin-01",     email: "admin@baruk.co",    password: "admin123",    role: "admin",    name: "Hub Admin" },
+const ADMIN_ACCOUNTS = [
+  { id: "admin-01", email: "admin@baruk.co", password: "admin123", role: "admin", name: "Hub Admin" },
 ];
 
-// ============================================================
-// LOGIN SCREEN
-// ============================================================
-function LoginScreen({ onLogin }) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
+const SEED_ACCOUNTS = [
+  { id: "cust-demo", email: "customer@baruk.co", password: "customer123", role: "customer", name: "Amara Osei",    phone: "0712000001" },
+  { id: "rider-01",  email: "kip@baruk.co",      password: "rider123",    role: "rider",    name: "Kip Mutai",     phone: "0712345001", zone: "Westlands", licenseNumber: "DL-2021-001" },
+  { id: "rider-02",  email: "faith@baruk.co",    password: "rider123",    role: "rider",    name: "Faith Wanjiru", phone: "0712345002", zone: "Ngong",      licenseNumber: "DL-2021-002" },
+];
 
-  const handleLogin = () => {
-    setError("");
+// ─── Shared auth UI primitives ────────────────────────────────
+const AuthInput = ({ label, value, onChange, type = "text", placeholder, icon }) => (
+  <div style={{ marginBottom: 16 }}>
+    <div style={{ fontSize: 12, fontWeight: 700, color: "#6B7280", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</div>
+    <div style={{ position: "relative" }}>
+      {icon && <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 15, pointerEvents: "none" }}>{icon}</span>}
+      <input
+        type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+        style={{ width: "100%", padding: icon ? "12px 14px 12px 38px" : "12px 14px", border: "1.5px solid #E5E7EB", borderRadius: 10, fontSize: 14, fontFamily: "inherit", boxSizing: "border-box", outline: "none", color: "#111827", transition: "border 0.15s" }}
+        onFocus={e => e.target.style.borderColor = "#DC2626"}
+        onBlur={e => e.target.style.borderColor = "#E5E7EB"}
+      />
+    </div>
+  </div>
+);
+
+const AuthLogo = () => (
+  <div style={{ marginBottom: 28, textAlign: "center" }}>
+    <div style={{ width: 64, height: 64, borderRadius: 20, background: "#DC2626", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, margin: "0 auto 12px", boxShadow: "0 8px 24px rgba(220,38,38,0.3)" }}>🏍️</div>
+    <div style={{ fontSize: 32, fontWeight: 900, color: "#DC2626", letterSpacing: "-1px" }}>Baruk</div>
+    <div style={{ fontSize: 14, color: "#9CA3AF", marginTop: 4 }}>Fast. Reliable. Trackable.</div>
+  </div>
+);
+
+const AuthError = ({ msg }) => msg ? (
+  <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#DC2626", fontWeight: 600, marginBottom: 16 }}>⚠️ {msg}</div>
+) : null;
+
+const AuthSuccess = ({ msg }) => msg ? (
+  <div style={{ background: "#ECFDF5", border: "1px solid #6EE7B7", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#065F46", fontWeight: 600, marginBottom: 16 }}>✅ {msg}</div>
+) : null;
+
+const AuthBtn = ({ label, onClick, loading, disabled }) => (
+  <button onClick={onClick} disabled={loading || disabled}
+    style={{ width: "100%", padding: "13px", background: loading || disabled ? "#FCA5A5" : "#DC2626", color: "#fff", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 800, cursor: loading || disabled ? "not-allowed" : "pointer", fontFamily: "inherit", marginTop: 4, transition: "background 0.15s", boxShadow: "0 2px 12px rgba(220,38,38,0.25)" }}>
+    {loading ? "Please wait..." : label}
+  </button>
+);
+
+// ============================================================
+// SIGNUP SCREEN — customers only
+// ============================================================
+function SignupScreen({ onSignup, onBack, accounts }) {
+  const [form, setForm] = useState({ name: "", email: "", phone: "", password: "", confirm: "" });
+  const [error, setError]     = useState("");
+  const [success, setSuccess] = useState("");
+  const [loading, setLoading] = useState(false);
+  const set = k => v => setForm(f => ({ ...f, [k]: v }));
+
+  const handleSignup = () => {
+    setError(""); setSuccess("");
+    if (!form.name || !form.email || !form.phone || !form.password || !form.confirm)
+      return setError("Please fill in all fields.");
+    if (form.password.length < 6)
+      return setError("Password must be at least 6 characters.");
+    if (form.password !== form.confirm)
+      return setError("Passwords do not match.");
+    if (accounts.find(a => a.email === form.email.trim().toLowerCase()))
+      return setError("An account with this email already exists.");
     setLoading(true);
     setTimeout(() => {
-      const user = MOCK_ACCOUNTS.find(a => a.email === email.trim().toLowerCase() && a.password === password);
-      if (user) {
-        onLogin(user);
-      } else {
-        setError("Incorrect email or password. Please try again.");
-      }
+      const newUser = {
+        id: `cust-${Date.now()}`, role: "customer",
+        name: form.name.trim(), email: form.email.trim().toLowerCase(),
+        phone: form.phone.trim(), password: form.password,
+      };
+      onSignup(newUser);
       setLoading(false);
-    }, 800);
+    }, 900);
   };
 
-  const handleKeyDown = (e) => { if (e.key === "Enter") handleLogin(); };
+  const allFilled = form.name && form.email && form.phone && form.password && form.confirm;
 
   return (
-    <div style={{ minHeight: "100vh", background: "#F9FAFB", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', system-ui, sans-serif", padding: 20 }}>
+    <div style={{ minHeight: "100dvh", background: "#F9FAFB", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', system-ui, sans-serif", padding: 20, overflowY: "auto" }}>
+      <div style={{ width: "100%", maxWidth: 420 }}>
+        <AuthLogo />
+        <div style={{ background: "#fff", borderRadius: 20, padding: 28, boxShadow: "0 4px 32px rgba(0,0,0,0.08)" }}>
+          <div style={{ fontSize: 22, fontWeight: 900, color: "#111827", marginBottom: 4 }}>Create Account</div>
+          <div style={{ fontSize: 14, color: "#6B7280", marginBottom: 24 }}>Sign up to start sending packages</div>
 
-    {/* Logo */}
-      <div style={{ marginBottom: 32, textAlign: "center" }}>
-        <div style={{ width: 64, height: 64, borderRadius: 20, background: "#DC2626", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, margin: "0 auto 12px", boxShadow: "0 8px 24px rgba(220,38,38,0.3)" }}>🏍️</div>
-        <div style={{ fontSize: 32, fontWeight: 900, color: "#DC2626", letterSpacing: "-1px" }}>Baruk</div>
-        <div style={{ fontSize: 14, color: "#9CA3AF", marginTop: 4 }}>Fast. Reliable. Trackable.</div>
-      </div>
+          <AuthInput label="Full Name"          value={form.name}     onChange={set("name")}     placeholder="e.g. Amara Osei"      icon="👤" />
+          <AuthInput label="Email Address"      value={form.email}    onChange={set("email")}    placeholder="you@example.com"      icon="✉️" type="email" />
+          <AuthInput label="Phone Number"       value={form.phone}    onChange={set("phone")}    placeholder="e.g. 0712 345 678"    icon="📞" type="tel" />
+          <AuthInput label="Password"           value={form.password} onChange={set("password")} placeholder="Min. 6 characters"    icon="🔒" type="password" />
+          <AuthInput label="Confirm Password"   value={form.confirm}  onChange={set("confirm")}  placeholder="Repeat your password" icon="🔒" type="password" />
 
-      {/* Card */}
-      <div style={{ width: "100%", maxWidth: 400, background: "#fff", borderRadius: 20, padding: 32, boxShadow: "0 4px 32px rgba(0,0,0,0.08)" }}>
-        <div style={{ fontSize: 20, fontWeight: 900, color: "#111827", marginBottom: 6 }}>Welcome back</div>
-        <div style={{ fontSize: 14, color: "#6B7280", marginBottom: 28 }}>Sign in to your Baruk account</div>
+          <AuthError msg={error} />
+          <AuthBtn label="Create Account" onClick={handleSignup} loading={loading} disabled={!allFilled} />
 
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#6B7280", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>Email</div>
-          <input
-            type="email" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={handleKeyDown}
-            placeholder="you@example.com"
-            style={{ width: "100%", padding: "12px 14px", border: "1.5px solid #E5E7EB", borderRadius: 10, fontSize: 14, fontFamily: "inherit", boxSizing: "border-box", outline: "none", transition: "border 0.15s" }}
-            onFocus={e => e.target.style.borderColor = "#DC2626"}
-            onBlur={e => e.target.style.borderColor = "#E5E7EB"}
-          />
-        </div>
-
-        <div style={{ marginBottom: 8 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#6B7280", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>Password</div>
-          <div style={{ position: "relative" }}>
-            <input
-              type={showPassword ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)} onKeyDown={handleKeyDown}
-              placeholder="••••••••"
-              style={{ width: "100%", padding: "12px 44px 12px 14px", border: "1.5px solid #E5E7EB", borderRadius: 10, fontSize: 14, fontFamily: "inherit", boxSizing: "border-box", outline: "none", transition: "border 0.15s" }}
-              onFocus={e => e.target.style.borderColor = "#DC2626"}
-              onBlur={e => e.target.style.borderColor = "#E5E7EB"}
-            />
-            <button onClick={() => setShowPassword(s => !s)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "#9CA3AF" }}>
-              {showPassword ? "🙈" : "👁️"}
-            </button>
+          <div style={{ textAlign: "center", marginTop: 20, paddingTop: 20, borderTop: "1px solid #F3F4F6" }}>
+            <span style={{ fontSize: 14, color: "#6B7280" }}>Already have an account? </span>
+            <button onClick={onBack} style={{ fontSize: 14, color: "#DC2626", fontWeight: 700, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>Sign In</button>
           </div>
-        </div>
-
-        {error && (
-          <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#DC2626", fontWeight: 600, marginBottom: 16 }}>
-            ⚠️ {error}
-          </div>
-        )}
-
-        <button
-          onClick={handleLogin} disabled={loading || !email || !password}
-          style={{ width: "100%", padding: "13px", background: loading || !email || !password ? "#FCA5A5" : "#DC2626", color: "#fff", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 800, cursor: loading || !email || !password ? "not-allowed" : "pointer", fontFamily: "inherit", marginTop: 8, transition: "background 0.15s", boxShadow: "0 2px 12px rgba(220,38,38,0.25)" }}
-        >
-          {loading ? "Signing in..." : "Sign In"}
-        </button>
-
-        {/* Demo hint */}
-        <div style={{ marginTop: 28, padding: 16, background: "#F9FAFB", borderRadius: 12, border: "1px dashed #E5E7EB" }}>
-          <div style={{ fontSize: 11, fontWeight: 800, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Demo Accounts</div>
-          {[
-            { role: "Customer", email: "customer@baruk.co", password: "customer123", icon: "📦" },
-            { role: "Rider",    email: "kip@baruk.co",      password: "rider123",    icon: "🏍️" },
-            { role: "Admin",    email: "admin@baruk.co",    password: "admin123",    icon: "🏭" },
-          ].map(a => (
-            <div key={a.role}
-              onClick={() => { setEmail(a.email); setPassword(a.password); setError(""); }}
-              style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, cursor: "pointer", marginBottom: 4, transition: "background 0.1s" }}
-              onMouseEnter={e => e.currentTarget.style.background = "#F3F4F6"}
-              onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-            >
-              <span style={{ fontSize: 18 }}>{a.icon}</span>
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "#374151" }}>{a.role}</div>
-                <div style={{ fontSize: 11, color: "#9CA3AF" }}>{a.email}</div>
-              </div>
-              <div style={{ marginLeft: "auto", fontSize: 11, color: "#DC2626", fontWeight: 700 }}>Click to fill</div>
-            </div>
-          ))}
         </div>
       </div>
     </div>
@@ -869,15 +943,102 @@ function LoginScreen({ onLogin }) {
 }
 
 // ============================================================
-// MAIN APP — AUTH + STATE ENGINE + ROLE-BASED ROUTING
+// LOGIN SCREEN
+// ============================================================
+function LoginScreen({ onLogin, onGoSignup, accounts }) {
+  const [email, setEmail]               = useState("");
+  const [password, setPassword]         = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError]               = useState("");
+  const [loading, setLoading]           = useState(false);
+
+  const allAccounts = [...ADMIN_ACCOUNTS, ...accounts];
+
+  const handleLogin = () => {
+    setError(""); setLoading(true);
+    setTimeout(() => {
+      const user = allAccounts.find(a => a.email === email.trim().toLowerCase() && a.password === password);
+      if (user) { onLogin(user); }
+      else { setError("Incorrect email or password. Please try again."); }
+      setLoading(false);
+    }, 800);
+  };
+
+  return (
+    <div style={{ minHeight: "100dvh", background: "#F9FAFB", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', system-ui, sans-serif", padding: 20 }}>
+      <div style={{ width: "100%", maxWidth: 420 }}>
+        <AuthLogo />
+        <div style={{ background: "#fff", borderRadius: 20, padding: 28, boxShadow: "0 4px 32px rgba(0,0,0,0.08)" }}>
+          <div style={{ fontSize: 22, fontWeight: 900, color: "#111827", marginBottom: 4 }}>Welcome back</div>
+          <div style={{ fontSize: 14, color: "#6B7280", marginBottom: 24 }}>Sign in to your Baruk account</div>
+
+          <AuthInput label="Email" value={email} onChange={setEmail} placeholder="you@example.com" icon="✉️" type="email" />
+
+          {/* Password with show/hide */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#6B7280", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>Password</div>
+            <div style={{ position: "relative" }}>
+              <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 15, pointerEvents: "none" }}>🔒</span>
+              <input
+                type={showPassword ? "text" : "password"} value={password}
+                onChange={e => setPassword(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleLogin()}
+                placeholder="••••••••"
+                style={{ width: "100%", padding: "12px 44px 12px 38px", border: "1.5px solid #E5E7EB", borderRadius: 10, fontSize: 14, fontFamily: "inherit", boxSizing: "border-box", outline: "none", color: "#111827" }}
+                onFocus={e => e.target.style.borderColor = "#DC2626"}
+                onBlur={e => e.target.style.borderColor = "#E5E7EB"}
+              />
+              <button onClick={() => setShowPassword(s => !s)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 16 }}>
+                {showPassword ? "🙈" : "👁️"}
+              </button>
+            </div>
+          </div>
+
+          <AuthError msg={error} />
+          <AuthBtn label="Sign In" onClick={handleLogin} loading={loading} disabled={!email || !password} />
+
+          {/* Customer signup link */}
+          <div style={{ textAlign: "center", marginTop: 20, paddingTop: 20, borderTop: "1px solid #F3F4F6" }}>
+            <span style={{ fontSize: 14, color: "#6B7280" }}>New customer? </span>
+            <button onClick={onGoSignup} style={{ fontSize: 14, color: "#DC2626", fontWeight: 700, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>Create an account →</button>
+          </div>
+
+          {/* Rider notice */}
+          <div style={{ marginTop: 16, padding: "12px 14px", background: "#F9FAFB", borderRadius: 10, border: "1px dashed #E5E7EB" }}>
+            <div style={{ fontSize: 12, color: "#6B7280", lineHeight: 1.6 }}>
+              🏍️ <strong>Riders:</strong> Your account is created by the Hub Admin. Contact your hub manager if you don't have login credentials yet.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// MAIN APP — AUTH + SIGNUP + STATE ENGINE + ROLE-BASED ROUTING
 // ============================================================
 export default function App() {
-  const [user, setUser] = useState(null);
+  const [user, setUser]         = useState(null);
+  const [authView, setAuthView] = useState("login"); // "login" | "signup"
+  const [accounts, setAccounts] = useState(SEED_ACCOUNTS);
   const [packages, setPackages] = useState(initialPackages);
-  const [logs, setLogs] = useState(initialLogs);
+  const [logs, setLogs]         = useState(initialLogs);
 
-  const handleLogin = (u) => setUser(u);
-  const handleLogout = () => setUser(null);
+  const handleLogin   = (u) => { setUser(u); setAuthView("login"); };
+  const handleLogout  = ()  => setUser(null);
+
+  // Customer self-signup
+  const handleSignup = (newUser) => {
+    setAccounts(a => [...a, newUser]);
+    setUser(newUser);
+    setAuthView("login");
+  };
+
+  // Admin creates a rider account
+  const handleAddRider = (newRider) => {
+    setAccounts(a => [...a, newRider]);
+  };
 
   const addLog = (packageId, actorId, actorRole, actorName, event, location, notes = null) => {
     const log = { id: `log-${Date.now()}`, packageId, actorId, actorRole, actorName, event, location, notes, createdAt: new Date().toISOString() };
@@ -908,26 +1069,26 @@ export default function App() {
   };
 
   const onAcceptCollection = (pkgId, riderId) => {
-    const rider = RIDERS.find(r => r.id === riderId);
+    const rider = accounts.find(r => r.id === riderId);
     updatePkg(pkgId, { riderCollectionId: riderId, status: "picked_up" });
     addLog(pkgId, riderId, "rider", rider?.name, "COLLECTED_FROM_CUSTOMER", packages.find(p => p.id === pkgId)?.pickupAddress, "Package collected");
   };
 
   const onMarkAtWarehouse = (pkgId, riderId) => {
-    const rider = RIDERS.find(r => r.id === riderId);
+    const rider = accounts.find(r => r.id === riderId);
     updatePkg(pkgId, { status: "at_warehouse" });
     addLog(pkgId, riderId, "rider", rider?.name, "ARRIVED_AT_WAREHOUSE", "Baruk Central, CBD");
   };
 
   const onDispatch = (pkgId, riderId) => {
-    const rider = RIDERS.find(r => r.id === riderId);
+    const rider = accounts.find(r => r.id === riderId);
     updatePkg(pkgId, { riderDeliveryId: riderId, status: "out_for_delivery" });
     addLog(pkgId, "admin-01", "admin", "Admin Hub", "DISPATCHED_TO_RIDER", "Baruk Central, CBD", `Assigned to ${rider?.name}`);
     addLog(pkgId, riderId, "rider", rider?.name, "OUT_FOR_DELIVERY", "Baruk Central, CBD");
   };
 
   const onAcceptDelivery = (pkgId, riderId) => {
-    const rider = RIDERS.find(r => r.id === riderId);
+    const rider = accounts.find(r => r.id === riderId);
     updatePkg(pkgId, { riderDeliveryId: riderId });
     addLog(pkgId, riderId, "rider", rider?.name, "ACCEPTED_DELIVERY_JOB", "Baruk Central, CBD");
   };
@@ -936,29 +1097,33 @@ export default function App() {
     const pkg = packages.find(p => p.id === pkgId);
     if (type === "warehouse") {
       updatePkg(pkgId, { otpWarehouseVerified: true });
-      addLog(pkgId, pkg.riderCollectionId, "rider", RIDERS.find(r => r.id === pkg.riderCollectionId)?.name, "OTP_WAREHOUSE_VERIFIED", "Baruk Central, CBD", "High-value handoff confirmed");
+      addLog(pkgId, pkg.riderCollectionId, "rider", accounts.find(r => r.id === pkg.riderCollectionId)?.name, "OTP_WAREHOUSE_VERIFIED", "Baruk Central, CBD", "High-value handoff confirmed");
     } else {
       updatePkg(pkgId, { otpDeliveryVerified: true });
-      addLog(pkgId, pkg.riderDeliveryId, "rider", RIDERS.find(r => r.id === pkg.riderDeliveryId)?.name, "OTP_DELIVERY_VERIFIED", pkg.deliveryAddress, "High-value delivery OTP confirmed");
+      addLog(pkgId, pkg.riderDeliveryId, "rider", accounts.find(r => r.id === pkg.riderDeliveryId)?.name, "OTP_DELIVERY_VERIFIED", pkg.deliveryAddress, "High-value delivery OTP confirmed");
     }
   };
 
   const onMarkDelivered = (pkgId, riderId) => {
-    const rider = RIDERS.find(r => r.id === riderId);
-    const pkg = packages.find(p => p.id === pkgId);
+    const rider = accounts.find(r => r.id === riderId);
+    const pkg   = packages.find(p => p.id === pkgId);
     updatePkg(pkgId, { status: "delivered" });
     addLog(pkgId, riderId, "rider", rider?.name, "DELIVERED", pkg?.deliveryAddress, "Package delivered successfully");
   };
 
-  // ── Not logged in → show login screen ──
-  if (!user) return <LoginScreen onLogin={handleLogin} />;
+  // ── Auth screens ──
+  if (!user) {
+    if (authView === "signup")
+      return <SignupScreen onSignup={handleSignup} onBack={() => setAuthView("login")} accounts={accounts} />;
+    return <LoginScreen onLogin={handleLogin} onGoSignup={() => setAuthView("signup")} accounts={accounts} />;
+  }
 
-  // ── Shared top bar with user info + logout ──
+  // ── Top bar ──
   const TopBar = () => (
     <div style={{ background: "#111827", padding: "10px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, zIndex: 100 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#22C55E" }} />
-        <span style={{ fontSize: 13, color: "#D1D5DB", fontWeight: 600 }}>{user.name}</span>
+        <span style={{ fontSize: 13, color: "#D1D5DB", fontWeight: 700 }}>{user.name}</span>
         <span style={{ fontSize: 11, background: "#374151", color: "#9CA3AF", padding: "2px 8px", borderRadius: 20, fontWeight: 700, textTransform: "uppercase" }}>{user.role}</span>
         {user.zone && <span style={{ fontSize: 11, background: "#DC2626", color: "#fff", padding: "2px 8px", borderRadius: 20, fontWeight: 700 }}>📍 {user.zone}</span>}
       </div>
@@ -968,13 +1133,16 @@ export default function App() {
     </div>
   );
 
+  // ── Riders = accounts with role rider ──
+  const riders = accounts.filter(a => a.role === "rider");
+
   // ── Route by role ──
   return (
-    <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", background: "#F1F5F9", minHeight: "100vh", minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
+    <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", background: "#F1F5F9", minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
       <TopBar />
       {user.role === "customer" && <CustomerApp packages={packages.filter(p => p.customerId === user.id)} onCreatePackage={onCreatePackage} transitLogs={logs} />}
       {user.role === "rider"    && <RiderApp packages={packages} onAcceptCollection={onAcceptCollection} onMarkAtWarehouse={onMarkAtWarehouse} onAcceptDelivery={onAcceptDelivery} onVerifyOTP={onVerifyOTP} onMarkDelivered={onMarkDelivered} transitLogs={logs} currentRider={user} />}
-      {user.role === "admin"    && <AdminDashboard packages={packages} riders={RIDERS} transitLogs={logs} onDispatch={onDispatch} />}
+      {user.role === "admin"    && <AdminDashboard packages={packages} riders={riders} transitLogs={logs} onDispatch={onDispatch} onAddRider={handleAddRider} accounts={accounts} />}
     </div>
   );
 }
