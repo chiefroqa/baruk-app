@@ -1078,6 +1078,126 @@ const LoadingScreen = () => (
 // ============================================================
 // MAIN APP — SUPABASE AUTH + REALTIME + ROLE-BASED ROUTING
 // ============================================================
+// PWA INSTALL BANNER
+// ============================================================
+function InstallBanner() {
+  const [show, setShow]         = useState(false);
+  const [isIOS, setIsIOS]       = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [installing, setInstalling] = useState(false);
+
+  useEffect(() => {
+    // Don't show if already installed (running as standalone PWA)
+    const isStandalone = window.matchMedia("(display-mode: standalone)").matches
+      || window.navigator.standalone === true;
+    if (isStandalone) return;
+
+    // Don't show if user dismissed it this session
+    if (sessionStorage.getItem("install-dismissed")) return;
+
+    const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    setIsIOS(ios);
+
+    if (ios) {
+      // iOS: show manual instructions after 2 seconds
+      setTimeout(() => setShow(true), 2000);
+    } else {
+      // Android/Chrome: wait for the native beforeinstallprompt event
+      const handler = (e) => {
+        e.preventDefault();
+        setDeferredPrompt(e);
+        setTimeout(() => setShow(true), 2000);
+      };
+      window.addEventListener("beforeinstallprompt", handler);
+      return () => window.removeEventListener("beforeinstallprompt", handler);
+    }
+  }, []);
+
+  const handleInstall = async () => {
+    if (!deferredPrompt) return;
+    setInstalling(true);
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    setInstalling(false);
+    setDeferredPrompt(null);
+    setShow(false);
+  };
+
+  const handleDismiss = () => {
+    setShow(false);
+    sessionStorage.setItem("install-dismissed", "1");
+  };
+
+  if (!show) return null;
+
+  return (
+    <div style={{
+      position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 9999,
+      background: "#fff", borderTop: "2px solid #FECACA",
+      boxShadow: "0 -4px 24px rgba(0,0,0,0.12)",
+      padding: "16px 20px", fontFamily: "'DM Sans', system-ui, sans-serif",
+      animation: "slideUp 0.3s ease-out",
+    }}>
+      <style>{`@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }`}</style>
+
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+        {/* Icon */}
+        <div style={{ width: 48, height: 48, borderRadius: 12, background: "#DC2626", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0, boxShadow: "0 4px 12px rgba(220,38,38,0.3)" }}>
+          🏍️
+        </div>
+
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 15, fontWeight: 900, color: "#111827", marginBottom: 2 }}>
+            Install Baruk App
+          </div>
+
+          {isIOS ? (
+            <div style={{ fontSize: 13, color: "#6B7280", lineHeight: 1.5 }}>
+              Tap <strong style={{ color: "#111827" }}>Share</strong> <span style={{ fontSize: 16 }}>⎋</span> at the bottom of Safari, then <strong style={{ color: "#111827" }}>"Add to Home Screen"</strong>
+            </div>
+          ) : (
+            <div style={{ fontSize: 13, color: "#6B7280" }}>
+              Get the full app experience — works offline, opens instantly
+            </div>
+          )}
+
+          {!isIOS && (
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <button onClick={handleInstall} disabled={installing}
+                style={{ background: "#DC2626", color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 2px 8px rgba(220,38,38,0.3)" }}>
+                {installing ? "Installing..." : "Install Now"}
+              </button>
+              <button onClick={handleDismiss}
+                style={{ background: "#F3F4F6", color: "#6B7280", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                Not now
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Close */}
+        <button onClick={handleDismiss}
+          style={{ background: "none", border: "none", fontSize: 20, color: "#9CA3AF", cursor: "pointer", padding: 4, lineHeight: 1, flexShrink: 0 }}>
+          ✕
+        </button>
+      </div>
+
+      {/* iOS step indicators */}
+      {isIOS && (
+        <div style={{ display: "flex", gap: 8, marginTop: 12, paddingTop: 12, borderTop: "1px solid #F3F4F6" }}>
+          {[["1", "Open in Safari"], ["2", "Tap Share ⎋"], ["3", "Add to Home Screen"]].map(([n, label]) => (
+            <div key={n} style={{ flex: 1, textAlign: "center", background: "#FEF2F2", borderRadius: 8, padding: "8px 4px" }}>
+              <div style={{ fontSize: 16, fontWeight: 900, color: "#DC2626" }}>{n}</div>
+              <div style={{ fontSize: 10, color: "#6B7280", fontWeight: 700, marginTop: 2, lineHeight: 1.3 }}>{label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
 export default function App() {
   const [user, setUser]         = useState(null);
   const [authView, setAuthView] = useState("login");
@@ -1267,8 +1387,8 @@ export default function App() {
   if (appLoading) return <LoadingScreen />;
 
   if (!user) {
-    if (authView === "signup") return <SignupScreen onBack={() => setAuthView("login")} />;
-    return <LoginScreen onGoSignup={() => setAuthView("signup")} />;
+    if (authView === "signup") return <><SignupScreen onBack={() => setAuthView("login")} /><InstallBanner /></>;
+    return <><LoginScreen onGoSignup={() => setAuthView("signup")} /><InstallBanner /></>;
   }
 
   const TopBar = () => (
@@ -1291,6 +1411,7 @@ export default function App() {
       {user.role === "customer" && <CustomerApp packages={packages.filter(p => p.customerId === user.id)} onCreatePackage={onCreatePackage} transitLogs={logs} />}
       {user.role === "rider"    && <RiderApp packages={packages} onAcceptCollection={onAcceptCollection} onMarkAtWarehouse={onMarkAtWarehouse} onAcceptDelivery={onAcceptDelivery} onVerifyOTP={onVerifyOTP} onMarkDelivered={onMarkDelivered} transitLogs={logs} currentRider={user} />}
       {user.role === "admin"    && <AdminDashboard packages={packages} riders={riders} transitLogs={logs} onDispatch={onDispatch} onAddRider={onAddRider} accounts={[...riders, user]} />}
+      <InstallBanner />
     </div>
   );
 }
