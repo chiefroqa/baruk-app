@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { supabase } from "./supabase";
 
 // Inject Google Font
 const fontLink = document.createElement("link");
