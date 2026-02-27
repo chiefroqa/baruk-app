@@ -831,19 +831,64 @@ function AdminDashboard({ packages, riders, transitLogs, onDispatch, onAddRider,
 }
 
 // ============================================================
-// ACCOUNT STORE (replace with Supabase Auth later)
+
 // ============================================================
-const ADMIN_ACCOUNTS = [
-  { id: "admin-01", email: "admin@baruk.co", password: "admin123", role: "admin", name: "Hub Admin" },
-];
+// SUPABASE AUTH HELPERS
+// ============================================================
 
-const SEED_ACCOUNTS = [
-  { id: "cust-demo", email: "customer@baruk.co", password: "customer123", role: "customer", name: "Amara Osei",    phone: "0712000001" },
-  { id: "rider-01",  email: "kip@baruk.co",      password: "rider123",    role: "rider",    name: "Kip Mutai",     phone: "0712345001", zone: "Westlands", licenseNumber: "DL-2021-001" },
-  { id: "rider-02",  email: "faith@baruk.co",    password: "rider123",    role: "rider",    name: "Faith Wanjiru", phone: "0712345002", zone: "Ngong",      licenseNumber: "DL-2021-002" },
-];
+// Map a Supabase profile row to the user shape the app expects
+const profileToUser = (authUser, profile) => ({
+  id:            authUser.id,
+  email:         authUser.email,
+  name:          profile.name,
+  phone:         profile.phone,
+  role:          profile.role,
+  zone:          profile.home_zone,
+  licenseNumber: profile.license_number,
+});
 
-// ─── Shared auth UI primitives ────────────────────────────────
+// Map a Supabase package row (snake_case) to app shape (camelCase)
+const dbPkgToApp = (p) => ({
+  id:                   p.id,
+  trackingCode:         p.tracking_code,
+  customerId:           p.customer_id,
+  customerName:         p.customer_name,
+  riderCollectionId:    p.rider_collection_id,
+  riderDeliveryId:      p.rider_delivery_id,
+  pickupAddress:        p.pickup_address,
+  deliveryAddress:      p.delivery_address,
+  deliveryZone:         p.delivery_zone,
+  description:          p.description,
+  size:                 p.size,
+  declaredValue:        p.declared_value,
+  base:                 p.base,
+  protectionFee:        p.protection_fee,
+  total:                p.total,
+  isHighValue:          p.is_high_value,
+  status:               p.status,
+  otpWarehouse:         p.otp_warehouse,
+  otpDelivery:          p.otp_delivery,
+  otpWarehouseVerified: p.otp_warehouse_verified,
+  otpDeliveryVerified:  p.otp_delivery_verified,
+  createdAt:            p.created_at,
+});
+
+// Map a Supabase transit_log row to app shape
+const dbLogToApp = (l) => ({
+  id:         l.id,
+  packageId:  l.package_id,
+  actorId:    l.actor_id,
+  actorRole:  l.actor_role,
+  actorName:  l.actor_name,
+  event:      l.event,
+  location:   l.location,
+  notes:      l.notes,
+  createdAt:  l.created_at,
+});
+
+// ============================================================
+// SHARED AUTH UI (reused by Login + Signup)
+// ============================================================
 const AuthInput = ({ label, value, onChange, type = "text", placeholder, icon }) => (
   <div style={{ marginBottom: 16 }}>
     <div style={{ fontSize: 12, fontWeight: 700, color: "#6B7280", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</div>
@@ -885,14 +930,14 @@ const AuthBtn = ({ label, onClick, loading, disabled }) => (
 // ============================================================
 // SIGNUP SCREEN — customers only
 // ============================================================
-function SignupScreen({ onSignup, onBack, accounts }) {
-  const [form, setForm] = useState({ name: "", email: "", phone: "", password: "", confirm: "" });
-  const [error, setError]     = useState("");
+function SignupScreen({ onBack }) {
+  const [form, setForm]     = useState({ name: "", email: "", phone: "", password: "", confirm: "" });
+  const [error, setError]   = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   const set = k => v => setForm(f => ({ ...f, [k]: v }));
 
-  const handleSignup = () => {
+  const handleSignup = async () => {
     setError(""); setSuccess("");
     if (!form.name || !form.email || !form.phone || !form.password || !form.confirm)
       return setError("Please fill in all fields.");
@@ -900,21 +945,29 @@ function SignupScreen({ onSignup, onBack, accounts }) {
       return setError("Password must be at least 6 characters.");
     if (form.password !== form.confirm)
       return setError("Passwords do not match.");
-    if (accounts.find(a => a.email === form.email.trim().toLowerCase()))
-      return setError("An account with this email already exists.");
-    setLoading(true);
-    setTimeout(() => {
-      const newUser = {
-        id: `cust-${Date.now()}`, role: "customer",
-        name: form.name.trim(), email: form.email.trim().toLowerCase(),
-        phone: form.phone.trim(), password: form.password,
-      };
-      onSignup(newUser);
-      setLoading(false);
-    }, 900);
-  };
 
-  const allFilled = form.name && form.email && form.phone && form.password && form.confirm;
+    setLoading(true);
+    try {
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: form.email.trim().toLowerCase(),
+        password: form.password,
+        options: {
+          data: {
+            name:  form.name.trim(),
+            phone: form.phone.trim(),
+            role:  "customer",
+          },
+        },
+      });
+      if (signUpError) throw signUpError;
+      setSuccess("Account created! You are now signed in.");
+      // onAuthStateChange in App will pick up the new session automatically
+    } catch (err) {
+      setError(err.message || "Signup failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div style={{ minHeight: "100dvh", background: "#F9FAFB", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', system-ui, sans-serif", padding: 20, overflowY: "auto" }}>
@@ -923,16 +976,14 @@ function SignupScreen({ onSignup, onBack, accounts }) {
         <div style={{ background: "#fff", borderRadius: 20, padding: 28, boxShadow: "0 4px 32px rgba(0,0,0,0.08)" }}>
           <div style={{ fontSize: 22, fontWeight: 900, color: "#111827", marginBottom: 4 }}>Create Account</div>
           <div style={{ fontSize: 14, color: "#6B7280", marginBottom: 24 }}>Sign up to start sending packages</div>
-
-          <AuthInput label="Full Name"          value={form.name}     onChange={set("name")}     placeholder="e.g. Amara Osei"      icon="👤" />
-          <AuthInput label="Email Address"      value={form.email}    onChange={set("email")}    placeholder="you@example.com"      icon="✉️" type="email" />
-          <AuthInput label="Phone Number"       value={form.phone}    onChange={set("phone")}    placeholder="e.g. 0712 345 678"    icon="📞" type="tel" />
-          <AuthInput label="Password"           value={form.password} onChange={set("password")} placeholder="Min. 6 characters"    icon="🔒" type="password" />
-          <AuthInput label="Confirm Password"   value={form.confirm}  onChange={set("confirm")}  placeholder="Repeat your password" icon="🔒" type="password" />
-
+          <AuthInput label="Full Name"         value={form.name}     onChange={set("name")}     placeholder="e.g. Amara Osei"      icon="👤" />
+          <AuthInput label="Email Address"     value={form.email}    onChange={set("email")}    placeholder="you@example.com"      icon="✉️" type="email" />
+          <AuthInput label="Phone Number"      value={form.phone}    onChange={set("phone")}    placeholder="e.g. 0712 345 678"    icon="📞" type="tel" />
+          <AuthInput label="Password"          value={form.password} onChange={set("password")} placeholder="Min. 6 characters"    icon="🔒" type="password" />
+          <AuthInput label="Confirm Password"  value={form.confirm}  onChange={set("confirm")}  placeholder="Repeat your password" icon="🔒" type="password" />
           <AuthError msg={error} />
-          <AuthBtn label="Create Account" onClick={handleSignup} loading={loading} disabled={!allFilled} />
-
+          <AuthSuccess msg={success} />
+          <AuthBtn label="Create Account" onClick={handleSignup} loading={loading} disabled={!form.name || !form.email || !form.phone || !form.password || !form.confirm} />
           <div style={{ textAlign: "center", marginTop: 20, paddingTop: 20, borderTop: "1px solid #F3F4F6" }}>
             <span style={{ fontSize: 14, color: "#6B7280" }}>Already have an account? </span>
             <button onClick={onBack} style={{ fontSize: 14, color: "#DC2626", fontWeight: 700, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>Sign In</button>
@@ -946,23 +997,27 @@ function SignupScreen({ onSignup, onBack, accounts }) {
 // ============================================================
 // LOGIN SCREEN
 // ============================================================
-function LoginScreen({ onLogin, onGoSignup, accounts }) {
+function LoginScreen({ onGoSignup }) {
   const [email, setEmail]               = useState("");
   const [password, setPassword]         = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError]               = useState("");
   const [loading, setLoading]           = useState(false);
 
-  const allAccounts = [...ADMIN_ACCOUNTS, ...accounts];
-
-  const handleLogin = () => {
+  const handleLogin = async () => {
     setError(""); setLoading(true);
-    setTimeout(() => {
-      const user = allAccounts.find(a => a.email === email.trim().toLowerCase() && a.password === password);
-      if (user) { onLogin(user); }
-      else { setError("Incorrect email or password. Please try again."); }
+    try {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
+      });
+      if (signInError) throw signInError;
+      // onAuthStateChange in App will handle routing
+    } catch (err) {
+      setError("Incorrect email or password. Please try again.");
+    } finally {
       setLoading(false);
-    }, 800);
+    }
   };
 
   return (
@@ -972,10 +1027,7 @@ function LoginScreen({ onLogin, onGoSignup, accounts }) {
         <div style={{ background: "#fff", borderRadius: 20, padding: 28, boxShadow: "0 4px 32px rgba(0,0,0,0.08)" }}>
           <div style={{ fontSize: 22, fontWeight: 900, color: "#111827", marginBottom: 4 }}>Welcome back</div>
           <div style={{ fontSize: 14, color: "#6B7280", marginBottom: 24 }}>Sign in to your Baruk account</div>
-
           <AuthInput label="Email" value={email} onChange={setEmail} placeholder="you@example.com" icon="✉️" type="email" />
-
-          {/* Password with show/hide */}
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#6B7280", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>Password</div>
             <div style={{ position: "relative" }}>
@@ -994,17 +1046,12 @@ function LoginScreen({ onLogin, onGoSignup, accounts }) {
               </button>
             </div>
           </div>
-
           <AuthError msg={error} />
           <AuthBtn label="Sign In" onClick={handleLogin} loading={loading} disabled={!email || !password} />
-
-          {/* Customer signup link */}
           <div style={{ textAlign: "center", marginTop: 20, paddingTop: 20, borderTop: "1px solid #F3F4F6" }}>
             <span style={{ fontSize: 14, color: "#6B7280" }}>New customer? </span>
             <button onClick={onGoSignup} style={{ fontSize: 14, color: "#DC2626", fontWeight: 700, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>Create an account →</button>
           </div>
-
-          {/* Rider notice */}
           <div style={{ marginTop: 16, padding: "12px 14px", background: "#F9FAFB", borderRadius: 10, border: "1px dashed #E5E7EB" }}>
             <div style={{ fontSize: 12, color: "#6B7280", lineHeight: 1.6 }}>
               🏍️ <strong>Riders:</strong> Your account is created by the Hub Admin. Contact your hub manager if you don't have login credentials yet.
@@ -1017,109 +1064,213 @@ function LoginScreen({ onLogin, onGoSignup, accounts }) {
 }
 
 // ============================================================
-// MAIN APP — AUTH + SIGNUP + STATE ENGINE + ROLE-BASED ROUTING
+// LOADING SCREEN
+// ============================================================
+const LoadingScreen = () => (
+  <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: "#F9FAFB", flexDirection: "column", gap: 16 }}>
+    <div style={{ width: 64, height: 64, borderRadius: 20, background: "#DC2626", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, boxShadow: "0 8px 24px rgba(220,38,38,0.3)" }}>🏍️</div>
+    <div style={{ fontSize: 24, fontWeight: 900, color: "#DC2626" }}>Baruk</div>
+    <div style={{ width: 32, height: 32, border: "3px solid #FECACA", borderTopColor: "#DC2626", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+  </div>
+);
+
+// ============================================================
+// MAIN APP — SUPABASE AUTH + REALTIME + ROLE-BASED ROUTING
 // ============================================================
 export default function App() {
   const [user, setUser]         = useState(null);
-  const [authView, setAuthView] = useState("login"); // "login" | "signup"
-  const [accounts, setAccounts] = useState(SEED_ACCOUNTS);
-  const [packages, setPackages] = useState(initialPackages);
-  const [logs, setLogs]         = useState(initialLogs);
+  const [authView, setAuthView] = useState("login");
+  const [appLoading, setAppLoading] = useState(true);
+  const [packages, setPackages] = useState([]);
+  const [logs, setLogs]         = useState([]);
+  const [riders, setRiders]     = useState([]);
+  const realtimeRef             = useRef(null);
 
-  const handleLogin   = (u) => { setUser(u); setAuthView("login"); };
-  const handleLogout  = ()  => setUser(null);
+  // ── Fetch profile from DB after auth ──
+  const loadProfile = useCallback(async (authUser) => {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", authUser.id)
+      .single();
+    if (profile) setUser(profileToUser(authUser, profile));
+  }, []);
 
-  // Customer self-signup
-  const handleSignup = (newUser) => {
-    setAccounts(a => [...a, newUser]);
-    setUser(newUser);
-    setAuthView("login");
+  // ── Fetch initial data ──
+  const loadPackages = useCallback(async () => {
+    const { data } = await supabase.from("packages").select("*").order("created_at", { ascending: false });
+    if (data) setPackages(data.map(dbPkgToApp));
+  }, []);
+
+  const loadLogs = useCallback(async () => {
+    const { data } = await supabase.from("transit_logs").select("*").order("created_at", { ascending: true });
+    if (data) setLogs(data.map(dbLogToApp));
+  }, []);
+
+  const loadRiders = useCallback(async () => {
+    const { data } = await supabase.from("profiles").select("*").eq("role", "rider");
+    if (data) setRiders(data.map(p => ({ id: p.id, name: p.name, phone: p.phone, zone: p.home_zone, licenseNumber: p.license_number, role: "rider" })));
+  }, []);
+
+  // ── Auth state listener ──
+  useEffect(() => {
+    // Check existing session on load
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) { loadProfile(session.user); }
+      setAppLoading(false);
+    });
+
+    // Listen for login/logout
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) { loadProfile(session.user); }
+      else { setUser(null); setPackages([]); setLogs([]); }
+    });
+    return () => subscription.unsubscribe();
+  }, [loadProfile]);
+
+  // ── Load data + set up realtime when user is ready ──
+  useEffect(() => {
+    if (!user) return;
+    loadPackages();
+    loadLogs();
+    loadRiders();
+
+    // Realtime subscriptions
+    const channel = supabase.channel("baruk-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "packages" }, () => loadPackages())
+      .on("postgres_changes", { event: "*", schema: "public", table: "transit_logs" }, () => loadLogs())
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => loadRiders())
+      .subscribe();
+
+    realtimeRef.current = channel;
+    return () => supabase.removeChannel(channel);
+  }, [user, loadPackages, loadLogs, loadRiders]);
+
+  // ── Logout ──
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
   };
 
-  // Admin creates a rider account
-  const handleAddRider = (newRider) => {
-    setAccounts(a => [...a, newRider]);
+  // ── Add log entry to DB ──
+  const addLog = async (packageId, actorId, actorRole, actorName, event, location, notes = null) => {
+    await supabase.from("transit_logs").insert({
+      package_id: packageId, actor_id: actorId, actor_role: actorRole,
+      actor_name: actorName, event, location, notes,
+    });
   };
 
-  const addLog = (packageId, actorId, actorRole, actorName, event, location, notes = null) => {
-    const log = { id: `log-${Date.now()}`, packageId, actorId, actorRole, actorName, event, location, notes, createdAt: new Date().toISOString() };
-    setLogs(l => [...l, log]);
-    return log;
+  // ── Update package in DB ──
+  const updatePkg = async (id, updates) => {
+    // Convert camelCase app fields back to snake_case for DB
+    const dbUpdates = {};
+    if (updates.status               !== undefined) dbUpdates.status                    = updates.status;
+    if (updates.riderCollectionId    !== undefined) dbUpdates.rider_collection_id        = updates.riderCollectionId;
+    if (updates.riderDeliveryId      !== undefined) dbUpdates.rider_delivery_id          = updates.riderDeliveryId;
+    if (updates.otpWarehouseVerified !== undefined) dbUpdates.otp_warehouse_verified     = updates.otpWarehouseVerified;
+    if (updates.otpDeliveryVerified  !== undefined) dbUpdates.otp_delivery_verified      = updates.otpDeliveryVerified;
+    await supabase.from("packages").update(dbUpdates).eq("id", id);
+    // Realtime will trigger loadPackages() automatically
   };
 
-  const updatePkg = (id, updates) => {
-    setPackages(ps => ps.map(p => p.id === id ? { ...p, ...updates, updatedAt: new Date().toISOString() } : p));
-  };
-
-  const onCreatePackage = (form) => {
+  // ── Create new package ──
+  const onCreatePackage = async (form) => {
     const { base, protectionFee, total, isHighValue } = calcFees(parseFloat(form.declaredValue) || 0);
-    const pkg = {
-      id: `pkg-${Date.now()}`, trackingCode: generateTracking(), customerId: user.id, customerName: user.name,
-      riderCollectionId: null, riderDeliveryId: null,
-      pickupAddress: form.pickupAddress, deliveryAddress: form.deliveryAddress,
-      deliveryZone: form.deliveryZone, description: form.description, size: form.size,
-      declaredValue: parseFloat(form.declaredValue) || 0,
-      base, protectionFee, total, isHighValue, status: "searching_rider",
-      otpWarehouse: isHighValue ? generateOTP() : null, otpDelivery: isHighValue ? generateOTP() : null,
-      otpWarehouseVerified: false, otpDeliveryVerified: false,
-      createdAt: new Date().toISOString(),
-    };
-    setPackages(ps => [pkg, ...ps]);
-    addLog(pkg.id, user.id, "customer", user.name, "ORDER_PLACED", pkg.pickupAddress, `Booking confirmed — KES ${pkg.total}`);
-    return pkg;
-  };
-
-  const onAcceptCollection = (pkgId, riderId) => {
-    const rider = accounts.find(r => r.id === riderId);
-    updatePkg(pkgId, { riderCollectionId: riderId, status: "picked_up" });
-    addLog(pkgId, riderId, "rider", rider?.name, "COLLECTED_FROM_CUSTOMER", packages.find(p => p.id === pkgId)?.pickupAddress, "Package collected");
-  };
-
-  const onMarkAtWarehouse = (pkgId, riderId) => {
-    const rider = accounts.find(r => r.id === riderId);
-    updatePkg(pkgId, { status: "at_warehouse" });
-    addLog(pkgId, riderId, "rider", rider?.name, "ARRIVED_AT_WAREHOUSE", "Baruk Central, CBD");
-  };
-
-  const onDispatch = (pkgId, riderId) => {
-    const rider = accounts.find(r => r.id === riderId);
-    updatePkg(pkgId, { riderDeliveryId: riderId, status: "out_for_delivery" });
-    addLog(pkgId, "admin-01", "admin", "Admin Hub", "DISPATCHED_TO_RIDER", "Baruk Central, CBD", `Assigned to ${rider?.name}`);
-    addLog(pkgId, riderId, "rider", rider?.name, "OUT_FOR_DELIVERY", "Baruk Central, CBD");
-  };
-
-  const onAcceptDelivery = (pkgId, riderId) => {
-    const rider = accounts.find(r => r.id === riderId);
-    updatePkg(pkgId, { riderDeliveryId: riderId });
-    addLog(pkgId, riderId, "rider", rider?.name, "ACCEPTED_DELIVERY_JOB", "Baruk Central, CBD");
-  };
-
-  const onVerifyOTP = (pkgId, type) => {
-    const pkg = packages.find(p => p.id === pkgId);
-    if (type === "warehouse") {
-      updatePkg(pkgId, { otpWarehouseVerified: true });
-      addLog(pkgId, pkg.riderCollectionId, "rider", accounts.find(r => r.id === pkg.riderCollectionId)?.name, "OTP_WAREHOUSE_VERIFIED", "Baruk Central, CBD", "High-value handoff confirmed");
-    } else {
-      updatePkg(pkgId, { otpDeliveryVerified: true });
-      addLog(pkgId, pkg.riderDeliveryId, "rider", accounts.find(r => r.id === pkg.riderDeliveryId)?.name, "OTP_DELIVERY_VERIFIED", pkg.deliveryAddress, "High-value delivery OTP confirmed");
+    const trackingCode = generateTracking();
+    const { data, error } = await supabase.from("packages").insert({
+      tracking_code:          trackingCode,
+      customer_id:            user.id,
+      customer_name:          user.name,
+      pickup_address:         form.pickupAddress,
+      delivery_address:       form.deliveryAddress,
+      delivery_zone:          form.deliveryZone,
+      description:            form.description,
+      size:                   form.size,
+      declared_value:         parseFloat(form.declaredValue) || 0,
+      base, protection_fee:   protectionFee, total,
+      is_high_value:          isHighValue,
+      status:                 "searching_rider",
+      otp_warehouse:          isHighValue ? generateOTP() : null,
+      otp_delivery:           isHighValue ? generateOTP() : null,
+    }).select().single();
+    if (data) {
+      await addLog(data.id, user.id, "customer", user.name, "ORDER_PLACED", form.pickupAddress, `Booking confirmed — KES ${total}`);
+      return dbPkgToApp(data);
     }
   };
 
-  const onMarkDelivered = (pkgId, riderId) => {
-    const rider = accounts.find(r => r.id === riderId);
-    const pkg   = packages.find(p => p.id === pkgId);
-    updatePkg(pkgId, { status: "delivered" });
-    addLog(pkgId, riderId, "rider", rider?.name, "DELIVERED", pkg?.deliveryAddress, "Package delivered successfully");
+  // ── Rider actions ──
+  const onAcceptCollection = async (pkgId, riderId) => {
+    const pkg = packages.find(p => p.id === pkgId);
+    await updatePkg(pkgId, { riderCollectionId: riderId, status: "picked_up" });
+    await addLog(pkgId, riderId, "rider", user.name, "COLLECTED_FROM_CUSTOMER", pkg?.pickupAddress, "Package collected");
   };
 
-  // ── Auth screens ──
+  const onMarkAtWarehouse = async (pkgId) => {
+    await updatePkg(pkgId, { status: "at_warehouse" });
+    await addLog(pkgId, user.id, "rider", user.name, "ARRIVED_AT_WAREHOUSE", "Baruk Central, CBD");
+  };
+
+  const onDispatch = async (pkgId, riderId) => {
+    const rider = riders.find(r => r.id === riderId);
+    await updatePkg(pkgId, { riderDeliveryId: riderId, status: "out_for_delivery" });
+    await addLog(pkgId, user.id, "admin", user.name, "DISPATCHED_TO_RIDER", "Baruk Central, CBD", `Assigned to ${rider?.name}`);
+    await addLog(pkgId, riderId, "rider", rider?.name, "OUT_FOR_DELIVERY", "Baruk Central, CBD");
+  };
+
+  const onAcceptDelivery = async (pkgId, riderId) => {
+    await updatePkg(pkgId, { riderDeliveryId: riderId });
+    await addLog(pkgId, riderId, "rider", user.name, "ACCEPTED_DELIVERY_JOB", "Baruk Central, CBD");
+  };
+
+  const onVerifyOTP = async (pkgId, type) => {
+    const pkg = packages.find(p => p.id === pkgId);
+    if (type === "warehouse") {
+      await updatePkg(pkgId, { otpWarehouseVerified: true });
+      await addLog(pkgId, user.id, "rider", user.name, "OTP_WAREHOUSE_VERIFIED", "Baruk Central, CBD", "High-value handoff confirmed");
+    } else {
+      await updatePkg(pkgId, { otpDeliveryVerified: true });
+      await addLog(pkgId, user.id, "rider", user.name, "OTP_DELIVERY_VERIFIED", pkg?.deliveryAddress, "High-value delivery OTP confirmed");
+    }
+  };
+
+  const onMarkDelivered = async (pkgId) => {
+    const pkg = packages.find(p => p.id === pkgId);
+    await updatePkg(pkgId, { status: "delivered" });
+    await addLog(pkgId, user.id, "rider", user.name, "DELIVERED", pkg?.deliveryAddress, "Package delivered successfully");
+  };
+
+  // ── Admin creates rider account ──
+  const onAddRider = async (riderData) => {
+    // Create auth user via Supabase Admin API
+    // NOTE: In production use a Supabase Edge Function for this
+    // For now we use signUp — rider will receive a confirmation email
+    const { data, error } = await supabase.auth.signUp({
+      email: riderData.email,
+      password: riderData.password,
+      options: {
+        data: {
+          name:           riderData.name,
+          phone:          riderData.phone,
+          role:           "rider",
+          home_zone:      riderData.zone,
+          license_number: riderData.licenseNumber,
+        },
+      },
+    });
+    if (error) throw error;
+    return data;
+  };
+
+  // ── Render ──
+  if (appLoading) return <LoadingScreen />;
+
   if (!user) {
-    if (authView === "signup")
-      return <SignupScreen onSignup={handleSignup} onBack={() => setAuthView("login")} accounts={accounts} />;
-    return <LoginScreen onLogin={handleLogin} onGoSignup={() => setAuthView("signup")} accounts={accounts} />;
+    if (authView === "signup") return <SignupScreen onBack={() => setAuthView("login")} />;
+    return <LoginScreen onGoSignup={() => setAuthView("signup")} />;
   }
 
-  // ── Top bar ──
   const TopBar = () => (
     <div style={{ background: "#111827", padding: "10px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, zIndex: 100 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1134,16 +1285,12 @@ export default function App() {
     </div>
   );
 
-  // ── Riders = accounts with role rider ──
-  const riders = accounts.filter(a => a.role === "rider");
-
-  // ── Route by role ──
   return (
     <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", background: "#F1F5F9", minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
       <TopBar />
       {user.role === "customer" && <CustomerApp packages={packages.filter(p => p.customerId === user.id)} onCreatePackage={onCreatePackage} transitLogs={logs} />}
       {user.role === "rider"    && <RiderApp packages={packages} onAcceptCollection={onAcceptCollection} onMarkAtWarehouse={onMarkAtWarehouse} onAcceptDelivery={onAcceptDelivery} onVerifyOTP={onVerifyOTP} onMarkDelivered={onMarkDelivered} transitLogs={logs} currentRider={user} />}
-      {user.role === "admin"    && <AdminDashboard packages={packages} riders={riders} transitLogs={logs} onDispatch={onDispatch} onAddRider={handleAddRider} accounts={accounts} />}
+      {user.role === "admin"    && <AdminDashboard packages={packages} riders={riders} transitLogs={logs} onDispatch={onDispatch} onAddRider={onAddRider} accounts={[...riders, user]} />}
     </div>
   );
 }
