@@ -75,15 +75,121 @@ create table transit_logs (
 // ============================================================
 // MOCK DATA & STATE ENGINE
 // ============================================================
-const ZONES = ["Westlands","Kasarani","CBD","Ngong","Embakasi","Thika Road","Karen","Ruiru"];
+// ZONE PRICING — THREE TIER MODEL
+// ============================================================
+const ZONE_DATA = {
+  // ── Zone 1: Inner Circle — KES 200 ──────────────────────────
+  "City Centre":     { tier: 1, base: 200, riderPay: 70, label: "City Centre" },
+  "River Road":      { tier: 1, base: 200, riderPay: 70, label: "River Road" },
+  "Ngara":           { tier: 1, base: 200, riderPay: 70, label: "Ngara" },
+  "Pangani":         { tier: 1, base: 200, riderPay: 70, label: "Pangani" },
+  "Parklands":       { tier: 1, base: 200, riderPay: 70, label: "Parklands" },
+  "Highridge":       { tier: 1, base: 200, riderPay: 70, label: "Highridge" },
+  "Riverside":       { tier: 1, base: 200, riderPay: 70, label: "Riverside" },
+  "Rhapta Road":     { tier: 1, base: 200, riderPay: 70, label: "Rhapta Road" },
+  "Upper Hill":      { tier: 1, base: 200, riderPay: 70, label: "Upper Hill" },
+  "Hurlingham":      { tier: 1, base: 200, riderPay: 70, label: "Hurlingham" },
+  "Milimani":        { tier: 1, base: 200, riderPay: 70, label: "Milimani" },
+  "Adams Arcade":    { tier: 1, base: 200, riderPay: 70, label: "Adams Arcade" },
+  "Lavington":       { tier: 1, base: 200, riderPay: 70, label: "Lavington" },
+  "Kileleshwa":      { tier: 1, base: 200, riderPay: 70, label: "Kileleshwa" },
+  "Muthangari":      { tier: 1, base: 200, riderPay: 70, label: "Muthangari" },
+  "Valley Arcade":   { tier: 1, base: 200, riderPay: 70, label: "Valley Arcade" },
+  "South C":         { tier: 1, base: 200, riderPay: 70, label: "South C" },
+  "South B":         { tier: 1, base: 200, riderPay: 70, label: "South B" },
+  "Hazina":          { tier: 1, base: 200, riderPay: 70, label: "Hazina" },
+  "Plainsview":      { tier: 1, base: 200, riderPay: 70, label: "Plainsview" },
+  "Makadara":        { tier: 1, base: 200, riderPay: 70, label: "Makadara" },
+  "Jogoo Road":      { tier: 1, base: 200, riderPay: 70, label: "Jogoo Road" },
+  "Doonholm":        { tier: 1, base: 200, riderPay: 70, label: "Doonholm" },
+  "Buruburu":        { tier: 1, base: 200, riderPay: 70, label: "Buruburu" },
+
+  // ── Zone 2: Mid-Tier — KES 250 ──────────────────────────────
+  "Roysambu":        { tier: 2, base: 250, riderPay: 90, label: "Roysambu" },
+  "Kasarani":        { tier: 2, base: 250, riderPay: 90, label: "Kasarani" },
+  "Zimmerman":       { tier: 2, base: 250, riderPay: 90, label: "Zimmerman" },
+  "Githurai 44/45":  { tier: 2, base: 250, riderPay: 90, label: "Githurai 44/45" },
+  "Embakasi":        { tier: 2, base: 250, riderPay: 90, label: "Embakasi" },
+  "Imara Daima":     { tier: 2, base: 250, riderPay: 90, label: "Imara Daima" },
+  "Pipeline":        { tier: 2, base: 250, riderPay: 90, label: "Pipeline" },
+  "Syokimau":        { tier: 2, base: 250, riderPay: 90, label: "Syokimau" },
+  "Kangemi":         { tier: 2, base: 250, riderPay: 90, label: "Kangemi" },
+  "Loresho":         { tier: 2, base: 250, riderPay: 90, label: "Loresho" },
+  "Mountain View":   { tier: 2, base: 250, riderPay: 90, label: "Mountain View" },
+  "Uthiru":          { tier: 2, base: 250, riderPay: 90, label: "Uthiru" },
+  "Langata":         { tier: 2, base: 250, riderPay: 90, label: "Langata" },
+  "Karen":           { tier: 2, base: 250, riderPay: 90, label: "Karen" },
+  "Hardy":           { tier: 2, base: 250, riderPay: 90, label: "Hardy" },
+  "Galleria":        { tier: 2, base: 250, riderPay: 90, label: "Galleria" },
+  "Umoja":           { tier: 2, base: 250, riderPay: 90, label: "Umoja" },
+  "Innercore":       { tier: 2, base: 250, riderPay: 90, label: "Innercore" },
+  "Komarock":        { tier: 2, base: 250, riderPay: 90, label: "Komarock" },
+  "Kayole":          { tier: 2, base: 250, riderPay: 90, label: "Kayole" },
+  "Njiru":           { tier: 2, base: 250, riderPay: 90, label: "Njiru" },
+  "Ridgeways":       { tier: 2, base: 250, riderPay: 90, label: "Ridgeways" },
+  "Muthaiga North":  { tier: 2, base: 250, riderPay: 90, label: "Muthaiga North" },
+  "Garden Estate":   { tier: 2, base: 250, riderPay: 90, label: "Garden Estate" },
+
+  // ── Zone 3: Outer Tier — KES 300 ────────────────────────────
+  "Ongata Rongai":   { tier: 3, base: 300, riderPay: 110, label: "Ongata Rongai" },
+  "Kiserian":        { tier: 3, base: 300, riderPay: 110, label: "Kiserian" },
+  "Ngong Town":      { tier: 3, base: 300, riderPay: 110, label: "Ngong Town" },
+  "Bulbul":          { tier: 3, base: 300, riderPay: 110, label: "Bulbul" },
+  "Ruiru":           { tier: 3, base: 300, riderPay: 110, label: "Ruiru" },
+  "Kenyatta Uni":    { tier: 3, base: 300, riderPay: 110, label: "Kenyatta Uni" },
+  "Juja":            { tier: 3, base: 300, riderPay: 110, label: "Juja" },
+  "Kitengela":       { tier: 3, base: 300, riderPay: 110, label: "Kitengela" },
+  "Athi River":      { tier: 3, base: 300, riderPay: 110, label: "Athi River" },
+  "Mlolongo":        { tier: 3, base: 300, riderPay: 110, label: "Mlolongo" },
+  "Kiambu Town":     { tier: 3, base: 300, riderPay: 110, label: "Kiambu Town" },
+  "Thindigua":       { tier: 3, base: 300, riderPay: 110, label: "Thindigua" },
+  "Kirigiti":        { tier: 3, base: 300, riderPay: 110, label: "Kirigiti" },
+  "Kikuyu":          { tier: 3, base: 300, riderPay: 110, label: "Kikuyu" },
+  "Sigona":          { tier: 3, base: 300, riderPay: 110, label: "Sigona" },
+  "Zambezi":         { tier: 3, base: 300, riderPay: 110, label: "Zambezi" },
+  "Ruai":            { tier: 3, base: 300, riderPay: 110, label: "Ruai" },
+  "Kamulu":          { tier: 3, base: 300, riderPay: 110, label: "Kamulu" },
+  "Utawala":         { tier: 3, base: 300, riderPay: 110, label: "Utawala" },
+};
+
+// Grouped for the zone picker UI
+const ZONE_GROUPS = [
+  {
+    tier: 1, label: "Zone 1 — Inner Circle", color: "#16A34A", bg: "#F0FDF4", border: "#BBF7D0", price: 200,
+    zones: Object.entries(ZONE_DATA).filter(([,v]) => v.tier === 1).map(([k]) => k),
+  },
+  {
+    tier: 2, label: "Zone 2 — Mid-Tier", color: "#D97706", bg: "#FFFBEB", border: "#FDE68A", price: 250,
+    zones: Object.entries(ZONE_DATA).filter(([,v]) => v.tier === 2).map(([k]) => k),
+  },
+  {
+    tier: 3, label: "Zone 3 — Outer", color: "#DC2626", bg: "#FEF2F2", border: "#FECACA", price: 300,
+    zones: Object.entries(ZONE_DATA).filter(([,v]) => v.tier === 3).map(([k]) => k),
+  },
+];
+
+// Flat list for dropdowns
+const ZONES = Object.keys(ZONE_DATA);
+
+// Get zone info — defaults to Zone 1 if not found
+const getZoneInfo = (zoneName) => ZONE_DATA[zoneName] || { tier: 1, base: 200, riderPay: 70 };
+
+const TIER_BADGE = {
+  1: { label: "Zone 1 · Inner", color: "#16A34A", bg: "#F0FDF4" },
+  2: { label: "Zone 2 · Mid",   color: "#D97706", bg: "#FFFBEB" },
+  3: { label: "Zone 3 · Outer", color: "#DC2626", bg: "#FEF2F2" },
+};
 
 const generateOTP = () => Math.floor(1000 + Math.random() * 9000).toString();
-const generateTracking = () => "MHB-" + Math.random().toString(36).substring(2,8).toUpperCase();
+const generateTracking = () => "BRK-" + Math.random().toString(36).substring(2,8).toUpperCase();
 
-const calcFees = (declaredValue) => {
-  const base = 200;
+const calcFees = (declaredValue, zoneName = "City Centre") => {
+  const zone         = getZoneInfo(zoneName);
+  const base         = zone.base;
+  const riderPay     = zone.riderPay;
   const protectionFee = declaredValue > 5000 ? Math.round(declaredValue * 0.015) : 0;
-  return { base, protectionFee, total: base + protectionFee, isHighValue: declaredValue > 10000 };
+  const isHighValue  = declaredValue > 10000;
+  return { base, riderPay, protectionFee, total: base + protectionFee, isHighValue, tier: zone.tier };
 };
 
 const initialPackages = [
@@ -259,7 +365,7 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
   const [codeError, setCodeError]   = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const fees = calcFees(parseFloat(form.declaredValue) || 0);
+  const fees = calcFees(parseFloat(form.declaredValue) || 0, form.deliveryZone);
   const canSubmit = form.pickupAddress && form.deliveryAddress && form.description;
 
   // Step 1 — customer fills form and clicks Book
@@ -460,7 +566,28 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
             <Card>
               <Input label="Pickup Address"       value={form.pickupAddress}   onChange={v => setForm(f => ({...f, pickupAddress: v}))}   placeholder="Where should we collect from?" />
               <Input label="Delivery Address"     value={form.deliveryAddress} onChange={v => setForm(f => ({...f, deliveryAddress: v}))} placeholder="Where should we deliver to?" />
-              <Select label="Delivery Zone"       value={form.deliveryZone}    onChange={v => setForm(f => ({...f, deliveryZone: v}))}    options={ZONES.map(z => ({value: z, label: z}))} />
+
+              {/* Zone picker with tier grouping */}
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#6B7280", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>Delivery Zone</div>
+                <select value={form.deliveryZone} onChange={e => setForm(f => ({...f, deliveryZone: e.target.value}))}
+                  style={{ width: "100%", padding: "10px 14px", border: "1.5px solid #E5E7EB", borderRadius: 10, fontSize: 14, fontFamily: "inherit", color: "#111827", background: "#fff", boxSizing: "border-box" }}>
+                  {ZONE_GROUPS.map(group => (
+                    <optgroup key={group.tier} label={`${group.label} — KES ${group.price}`}>
+                      {group.zones.map(z => <option key={z} value={z}>{z}</option>)}
+                    </optgroup>
+                  ))}
+                </select>
+                {/* Tier badge */}
+                {form.deliveryZone && (() => {
+                  const t = TIER_BADGE[getZoneInfo(form.deliveryZone).tier];
+                  return (
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 6, background: t.bg, color: t.color, padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 700 }}>
+                      <span>●</span> {t.label}
+                    </div>
+                  );
+                })()}
+              </div>
               <Input label="Item Description"     value={form.description}     onChange={v => setForm(f => ({...f, description: v}))}     placeholder="e.g. Electronics, Documents..." />
               <Select label="Package Size"        value={form.size}            onChange={v => setForm(f => ({...f, size: v}))}            options={[{value:"small",label:"Small (under 5kg)"},{value:"medium",label:"Medium (5-15kg)"},{value:"large",label:"Large (15kg+)"}]} />
               <Input label="Declared Value (KES)" value={form.declaredValue}   onChange={v => setForm(f => ({...f, declaredValue: v}))}   type="number" placeholder="0" />
@@ -470,7 +597,7 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
             <Card style={{ marginTop: 12, background: "#FEF2F2", border: "1.5px solid #FECACA" }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: "#7F1D1D", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.06em" }}>Fee Breakdown</div>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                <span style={{ color: "#6B7280", fontSize: 14 }}>Base Rate</span>
+                <span style={{ color: "#6B7280", fontSize: 14 }}>Base Rate {fees.tier && <span style={{ fontSize: 11, background: TIER_BADGE[fees.tier]?.bg, color: TIER_BADGE[fees.tier]?.color, padding: "1px 7px", borderRadius: 10, fontWeight: 700, marginLeft: 6 }}>Zone {fees.tier}</span>}</span>
                 <span style={{ fontWeight: 700, color: "#111827" }}>KES {fees.base}</span>
               </div>
               {fees.protectionFee > 0 && (
@@ -782,7 +909,7 @@ function AdminDashboard({ packages, riders, transitLogs, onDispatch, onAddRider,
                       <td style={{ padding: "12px 16px", fontFamily: "monospace", fontWeight: 600, fontSize: 13, color: "#111827" }}>{pkg.trackingCode}</td>
                       <td style={{ padding: "12px 16px", fontSize: 13, color: "#374151" }}>{pkg.description}</td>
                       <td style={{ padding: "12px 16px", fontSize: 13, color: "#374151" }}>{pkg.customerName}</td>
-                      <td style={{ padding: "12px 16px" }}><span style={{ background: "#FEF2F2", color: "#DC2626", padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 700 }}>{pkg.deliveryZone}</span></td>
+                      <td style={{ padding: "12px 16px" }}>{(() => { const t = TIER_BADGE[getZoneInfo(pkg.deliveryZone).tier]; return <span style={{ background: t.bg, color: t.color, padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 700 }}>{pkg.deliveryZone}</span>; })()}</td>
                       <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 700, color: "#111827" }}>KES {pkg.declaredValue.toLocaleString()}</td>
                       <td style={{ padding: "12px 16px", fontSize: 13, color: "#DC2626", fontWeight: 700 }}>KES {pkg.total}</td>
                       <td style={{ padding: "12px 16px" }}>
@@ -1468,7 +1595,7 @@ export default function App() {
 
   // ── Create new package ──
   const onCreatePackage = async (form) => {
-    const { base, protectionFee, total, isHighValue } = calcFees(parseFloat(form.declaredValue) || 0);
+    const { base, protectionFee, total, isHighValue, riderPay } = calcFees(parseFloat(form.declaredValue) || 0, form.deliveryZone);
     const trackingCode = generateTracking();
     const { data, error } = await supabase.from("packages").insert({
       tracking_code:          trackingCode,
