@@ -239,33 +239,66 @@ const Timeline = ({ logs }) => (
 // ============================================================
 // CUSTOMER APP
 // ============================================================
+// M-PESA CONFIG
+// ============================================================
+const MPESA_TILL    = "8036678";
+const MPESA_NAME    = "Coral Crafts";
+
+// ============================================================
+// CUSTOMER APP
+// ============================================================
 function CustomerApp({ packages, onCreatePackage, transitLogs }) {
-  const [view, setView] = useState("track"); // "track" | "new"
-  const [form, setForm] = useState({ pickupAddress: "", deliveryAddress: "", deliveryZone: ZONES[0], description: "", size: "small", declaredValue: "" });
-  const [submitted, setSubmitted] = useState(null);
+  const [view, setView]             = useState("track");
+  const [form, setForm]             = useState({ pickupAddress: "", deliveryAddress: "", deliveryZone: ZONES[0], description: "", size: "small", declaredValue: "" });
   const [expandedPkg, setExpandedPkg] = useState(null);
 
-  const myPackages = packages.filter(p => p.customerId === "cust-current");
-  const fees = calcFees(parseFloat(form.declaredValue) || 0);
+  // Payment flow stages: "form" → "payment" → "confirm" → "done"
+  const [stage, setStage]           = useState("form");
+  const [pendingPkg, setPendingPkg] = useState(null);
+  const [mpesaCode, setMpesaCode]   = useState("");
+  const [codeError, setCodeError]   = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = () => {
-    if (!form.pickupAddress || !form.deliveryAddress || !form.description) return;
-    const pkg = onCreatePackage(form);
-    setSubmitted(pkg);
-    setView("track");
+  const fees = calcFees(parseFloat(form.declaredValue) || 0);
+  const canSubmit = form.pickupAddress && form.deliveryAddress && form.description;
+
+  // Step 1 — customer fills form and clicks Book
+  const handleBook = async () => {
+    if (!canSubmit) return;
+    setSubmitting(true);
+    const pkg = await onCreatePackage({ ...form, paymentStatus: "pending" });
+    setPendingPkg(pkg);
+    setStage("payment");
+    setSubmitting(false);
     setForm({ pickupAddress: "", deliveryAddress: "", deliveryZone: ZONES[0], description: "", size: "small", declaredValue: "" });
   };
 
+  // Step 2 — customer pastes their M-Pesa confirmation code
+  const handleConfirmPayment = () => {
+    setCodeError("");
+    const code = mpesaCode.trim().toUpperCase();
+    // M-Pesa codes are 10 alphanumeric characters e.g. QHX4RT7K9P
+    if (code.length < 8) return setCodeError("Please enter a valid M-Pesa confirmation code.");
+    setStage("done");
+  };
+
+  const handleNewOrder = () => {
+    setStage("form");
+    setPendingPkg(null);
+    setMpesaCode("");
+    setView("new");
+  };
+
   const TrackingProgress = ({ status }) => {
-    const steps = ["searching_rider","picked_up","at_warehouse","out_for_delivery","delivered"];
-    const idx = steps.indexOf(status);
-    const labels = ["Searching","Picked Up","At Warehouse","Out for Delivery","Delivered"];
+    const steps  = ["searching_rider","picked_up","at_warehouse","out_for_delivery","delivered"];
+    const labels = ["Searching","Picked Up","At Hub","On the Way","Delivered"];
+    const idx    = steps.indexOf(status);
     return (
-      <div style={{ display: "flex", alignItems: "center", gap: 0, margin: "16px 0" }}>
+      <div style={{ display: "flex", alignItems: "center", margin: "16px 0" }}>
         {steps.map((s, i) => (
           <div key={s} style={{ display: "flex", alignItems: "center", flex: 1 }}>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
-              <div style={{ width: 24, height: 24, borderRadius: "50%", background: i <= idx ? "#DC2626" : "#E5E7EB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: i <= idx ? "#fff" : "#9CA3AF", fontWeight: 600, flexShrink: 0 }}>
+              <div style={{ width: 24, height: 24, borderRadius: "50%", background: i <= idx ? "#DC2626" : "#E5E7EB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: i <= idx ? "#fff" : "#9CA3AF", fontWeight: 700, flexShrink: 0 }}>
                 {i < idx ? "✓" : i + 1}
               </div>
               <div style={{ fontSize: 9, textAlign: "center", color: i <= idx ? "#DC2626" : "#9CA3AF", fontWeight: i === idx ? 800 : 500, marginTop: 4, lineHeight: 1.2, width: 52 }}>{labels[i]}</div>
@@ -277,21 +310,144 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
     );
   };
 
+  // ── Payment screen ──────────────────────────────────────────
+  if (stage === "payment" && pendingPkg) {
+    return (
+      <div style={{ maxWidth: 480, margin: "0 auto", fontFamily: "'DM Sans', system-ui, sans-serif", padding: 20 }}>
+        {/* Progress steps */}
+        <div style={{ display: "flex", alignItems: "center", marginBottom: 28 }}>
+          {[["1","Book"],["2","Pay"],["3","Done"]].map(([n, label], i) => (
+            <div key={n} style={{ display: "flex", alignItems: "center", flex: 1 }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
+                <div style={{ width: 32, height: 32, borderRadius: "50%", background: i === 0 ? "#10B981" : i === 1 ? "#DC2626" : "#E5E7EB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: "#fff", fontWeight: 800 }}>
+                  {i === 0 ? "✓" : n}
+                </div>
+                <div style={{ fontSize: 11, color: i === 1 ? "#DC2626" : "#9CA3AF", fontWeight: i === 1 ? 800 : 600, marginTop: 4 }}>{label}</div>
+              </div>
+              {i < 2 && <div style={{ height: 2, flex: 1, background: i === 0 ? "#10B981" : "#E5E7EB", marginBottom: 20 }} />}
+            </div>
+          ))}
+        </div>
+
+        {/* Order summary */}
+        <Card style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Order Summary</div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+            <span style={{ fontSize: 13, color: "#6B7280" }}>Tracking</span>
+            <span style={{ fontSize: 13, fontWeight: 800, color: "#111827", fontFamily: "monospace" }}>{pendingPkg.trackingCode}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+            <span style={{ fontSize: 13, color: "#6B7280" }}>Item</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{pendingPkg.description}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 8, borderTop: "1px solid #F3F4F6", marginTop: 8 }}>
+            <span style={{ fontSize: 15, fontWeight: 800, color: "#111827" }}>Amount Due</span>
+            <span style={{ fontSize: 18, fontWeight: 900, color: "#DC2626" }}>KES {pendingPkg.total}</span>
+          </div>
+        </Card>
+
+        {/* M-Pesa payment instructions */}
+        <Card style={{ background: "#F0FDF4", border: "1.5px solid #6EE7B7", marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: "#16A34A", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>📱</div>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 900, color: "#14532D" }}>Pay via M-Pesa</div>
+              <div style={{ fontSize: 12, color: "#16A34A" }}>Lipa Na M-Pesa · Buy Goods</div>
+            </div>
+          </div>
+
+          {[
+            ["Open M-Pesa", "Go to M-Pesa on your phone"],
+            ["Select", "Lipa Na M-Pesa → Buy Goods & Services"],
+            ["Till Number", MPESA_TILL],
+            ["Business Name", MPESA_NAME],
+            ["Amount", `KES ${pendingPkg.total}`],
+            ["Reference", pendingPkg.trackingCode],
+          ].map(([label, value], i) => (
+            <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingVertical: 6, borderBottom: i < 5 ? "1px solid #DCFCE7" : "none", paddingBottom: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: 12, color: "#16A34A", fontWeight: 700 }}>{label}</span>
+              <span style={{ fontSize: i >= 2 ? 15 : 13, fontWeight: i >= 2 ? 900 : 600, color: "#14532D", letterSpacing: i === 2 ? 2 : 0 }}>{value}</span>
+            </div>
+          ))}
+
+          <div style={{ background: "#DCFCE7", borderRadius: 8, padding: "10px 12px", marginTop: 8 }}>
+            <div style={{ fontSize: 12, color: "#14532D", fontWeight: 700 }}>
+              ⚠️ Use your tracking code <strong>{pendingPkg.trackingCode}</strong> as the reference so we can match your payment.
+            </div>
+          </div>
+        </Card>
+
+        {/* Confirmation code input */}
+        <Card>
+          <div style={{ fontSize: 14, fontWeight: 900, color: "#111827", marginBottom: 4 }}>Paid? Enter your confirmation code</div>
+          <div style={{ fontSize: 13, color: "#6B7280", marginBottom: 14 }}>After paying you'll receive an SMS from M-Pesa with a code like <strong>QHX4RT7K9P</strong></div>
+          <input
+            value={mpesaCode} onChange={e => setMpesaCode(e.target.value.toUpperCase())}
+            placeholder="e.g. QHX4RT7K9P" maxLength={12}
+            style={{ width: "100%", padding: "12px 14px", border: `1.5px solid ${codeError ? "#EF4444" : "#E5E7EB"}`, borderRadius: 10, fontSize: 18, fontFamily: "monospace", fontWeight: 800, letterSpacing: 3, boxSizing: "border-box", outline: "none", color: "#111827", textTransform: "uppercase" }}
+            onFocus={e => e.target.style.borderColor = "#DC2626"}
+            onBlur={e => e.target.style.borderColor = codeError ? "#EF4444" : "#E5E7EB"}
+          />
+          {codeError && <div style={{ color: "#EF4444", fontSize: 13, fontWeight: 600, marginTop: 6 }}>⚠️ {codeError}</div>}
+          <Btn onClick={handleConfirmPayment} style={{ width: "100%", marginTop: 14 }} size="lg" disabled={!mpesaCode}>Confirm Payment</Btn>
+        </Card>
+
+        <div style={{ textAlign: "center", marginTop: 16 }}>
+          <button onClick={() => { setStage("form"); setView("track"); }} style={{ fontSize: 13, color: "#9CA3AF", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+            I'll pay later — track my order →
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Done / success screen ───────────────────────────────────
+  if (stage === "done" && pendingPkg) {
+    return (
+      <div style={{ maxWidth: 480, margin: "0 auto", fontFamily: "'DM Sans', system-ui, sans-serif", padding: 20 }}>
+        <div style={{ textAlign: "center", paddingTop: 40, paddingBottom: 32 }}>
+          <div style={{ fontSize: 72, marginBottom: 16 }}>🎉</div>
+          <div style={{ fontSize: 24, fontWeight: 900, color: "#111827", marginBottom: 8 }}>Payment Confirmed!</div>
+          <div style={{ fontSize: 15, color: "#6B7280", marginBottom: 24 }}>Your delivery is now active. A rider will be assigned shortly.</div>
+          <Card style={{ textAlign: "left", marginBottom: 24 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>Booking Details</div>
+            {[
+              ["Tracking Code", pendingPkg.trackingCode],
+              ["M-Pesa Code",   mpesaCode],
+              ["Amount Paid",   `KES ${pendingPkg.total}`],
+              ["Delivering to", pendingPkg.deliveryAddress],
+            ].map(([label, value]) => (
+              <div key={label} style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+                <span style={{ fontSize: 13, color: "#6B7280" }}>{label}</span>
+                <span style={{ fontSize: 13, fontWeight: 800, color: "#111827", fontFamily: label === "Tracking Code" || label === "M-Pesa Code" ? "monospace" : "inherit" }}>{value}</span>
+              </div>
+            ))}
+          </Card>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <Btn onClick={() => { setStage("form"); setView("track"); setPendingPkg(null); setMpesaCode(""); }} variant="primary" size="lg" style={{ width: "100%" }}>Track My Order →</Btn>
+            <Btn onClick={handleNewOrder} variant="ghost" size="md" style={{ width: "100%" }}>Book Another Delivery</Btn>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Main view ───────────────────────────────────────────────
   return (
-    <div style={{ maxWidth: 480, margin: "0 auto", fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
+    <div style={{ maxWidth: 480, margin: "0 auto", fontFamily: "'DM Sans', system-ui, sans-serif" }}>
       {/* Header */}
       <div style={{ background: "#fff", padding: "20px 20px 0", borderRadius: "0 0 24px 24px", borderBottom: "2px solid #FECACA", boxShadow: "0 2px 16px rgba(220,38,38,0.08)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div>
-            <div style={{ fontSize: 22, fontWeight: 600, color: "#DC2626", letterSpacing: "0.01em" }}>Baruk</div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: "#DC2626", letterSpacing: "-0.5px" }}>Baruk</div>
             <div style={{ fontSize: 12, color: "#EF4444" }}>Fast. Reliable. Trackable.</div>
           </div>
           <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#FEE2E2", border: "1.5px solid #FECACA", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>👤</div>
         </div>
-        <div style={{ display: "flex", gap: 4, paddingBottom: 0 }}>
-          {["track","new"].map(v => (
-            <button key={v} onClick={() => setView(v)} style={{ flex: 1, padding: "10px 0", border: "none", background: view === v ? "#DC2626" : "transparent", color: view === v ? "#fff" : "#DC2626", fontWeight: 600, borderRadius: "10px 10px 0 0", cursor: "pointer", fontSize: 14, fontFamily: "inherit", borderTop: view === v ? "none" : "1.5px solid #FECACA" }}>
-              {v === "track" ? "📦 My Orders" : "＋ New Order"}
+        <div style={{ display: "flex", gap: 4 }}>
+          {[["track","📦 My Orders"],["new","＋ New Order"]].map(([v, label]) => (
+            <button key={v} onClick={() => setView(v)} style={{ flex: 1, padding: "10px 0", border: "none", background: view === v ? "#DC2626" : "transparent", color: view === v ? "#fff" : "#DC2626", fontWeight: 700, borderRadius: "10px 10px 0 0", cursor: "pointer", fontSize: 14, fontFamily: "inherit" }}>
+              {label}
             </button>
           ))}
         </div>
@@ -300,17 +456,17 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
       <div style={{ padding: "20px 16px" }}>
         {view === "new" ? (
           <div>
-            <h2 style={{ fontSize: 18, fontWeight: 600, color: "#111827", marginBottom: 20, marginTop: 0 }}>Book a Delivery</h2>
+            <h2 style={{ fontSize: 18, fontWeight: 900, color: "#111827", marginBottom: 20, marginTop: 0 }}>Book a Delivery</h2>
             <Card>
-              <Input label="Pickup Address" value={form.pickupAddress} onChange={v => setForm(f => ({...f, pickupAddress: v}))} placeholder="Where should we collect from?" />
-              <Input label="Delivery Address" value={form.deliveryAddress} onChange={v => setForm(f => ({...f, deliveryAddress: v}))} placeholder="Where should we deliver to?" />
-              <Select label="Delivery Zone" value={form.deliveryZone} onChange={v => setForm(f => ({...f, deliveryZone: v}))} options={ZONES.map(z => ({value: z, label: z}))} />
-              <Input label="Item Description" value={form.description} onChange={v => setForm(f => ({...f, description: v}))} placeholder="e.g. Electronics, Documents..." />
-              <Select label="Package Size" value={form.size} onChange={v => setForm(f => ({...f, size: v}))} options={[{value:"small",label:"Small (under 5kg)"},{value:"medium",label:"Medium (5-15kg)"},{value:"large",label:"Large (15kg+)"}]} />
-              <Input label="Declared Value (KES)" value={form.declaredValue} onChange={v => setForm(f => ({...f, declaredValue: v}))} type="number" placeholder="0" />
+              <Input label="Pickup Address"       value={form.pickupAddress}   onChange={v => setForm(f => ({...f, pickupAddress: v}))}   placeholder="Where should we collect from?" />
+              <Input label="Delivery Address"     value={form.deliveryAddress} onChange={v => setForm(f => ({...f, deliveryAddress: v}))} placeholder="Where should we deliver to?" />
+              <Select label="Delivery Zone"       value={form.deliveryZone}    onChange={v => setForm(f => ({...f, deliveryZone: v}))}    options={ZONES.map(z => ({value: z, label: z}))} />
+              <Input label="Item Description"     value={form.description}     onChange={v => setForm(f => ({...f, description: v}))}     placeholder="e.g. Electronics, Documents..." />
+              <Select label="Package Size"        value={form.size}            onChange={v => setForm(f => ({...f, size: v}))}            options={[{value:"small",label:"Small (under 5kg)"},{value:"medium",label:"Medium (5-15kg)"},{value:"large",label:"Large (15kg+)"}]} />
+              <Input label="Declared Value (KES)" value={form.declaredValue}   onChange={v => setForm(f => ({...f, declaredValue: v}))}   type="number" placeholder="0" />
             </Card>
 
-            {/* Fee Preview */}
+            {/* Fee preview */}
             <Card style={{ marginTop: 12, background: "#FEF2F2", border: "1.5px solid #FECACA" }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: "#7F1D1D", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.06em" }}>Fee Breakdown</div>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
@@ -324,8 +480,8 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
                 </div>
               )}
               <div style={{ borderTop: "1px solid #FECACA", marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between" }}>
-                <span style={{ fontWeight: 600, color: "#111827" }}>Total</span>
-                <span style={{ fontWeight: 600, color: "#DC2626", fontSize: 18 }}>KES {fees.total}</span>
+                <span style={{ fontWeight: 800, color: "#111827", fontSize: 15 }}>Total</span>
+                <span style={{ fontWeight: 900, color: "#DC2626", fontSize: 20 }}>KES {fees.total}</span>
               </div>
               {fees.isHighValue && (
                 <div style={{ marginTop: 10, padding: "8px 12px", background: "#FEF2F2", borderRadius: 8, fontSize: 12, color: "#DC2626", fontWeight: 600 }}>
@@ -333,21 +489,37 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
                 </div>
               )}
             </Card>
-            <Btn onClick={handleSubmit} style={{ width: "100%", marginTop: 16 }} size="lg">Confirm & Book — KES {fees.total}</Btn>
+
+            {/* M-Pesa preview pill */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 12, padding: "10px 14px", marginTop: 12 }}>
+              <span style={{ fontSize: 20 }}>📱</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#14532D" }}>Pay via M-Pesa after booking</div>
+                <div style={{ fontSize: 11, color: "#16A34A" }}>Till {MPESA_TILL} · {MPESA_NAME}</div>
+              </div>
+              <span style={{ fontSize: 14, fontWeight: 900, color: "#16A34A" }}>KES {fees.total}</span>
+            </div>
+
+            <Btn onClick={handleBook} style={{ width: "100%", marginTop: 16 }} size="lg" disabled={!canSubmit || submitting}>
+              {submitting ? "Booking..." : `Book & Pay — KES ${fees.total}`}
+            </Btn>
           </div>
         ) : (
           <div>
-            <h2 style={{ fontSize: 18, fontWeight: 600, color: "#111827", marginBottom: 16, marginTop: 0 }}>Your Deliveries</h2>
-            {submitted && (
-              <Card style={{ marginBottom: 12, background: "#ECFDF5", border: "1.5px solid #6EE7B7" }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: "#065F46" }}>✅ Order placed! Tracking: {submitted.trackingCode}</div>
+            <h2 style={{ fontSize: 18, fontWeight: 900, color: "#111827", marginBottom: 16, marginTop: 0 }}>Your Deliveries</h2>
+            {packages.length === 0 && (
+              <Card style={{ textAlign: "center", padding: "40px 20px" }}>
+                <div style={{ fontSize: 48, marginBottom: 12 }}>📦</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#374151" }}>No deliveries yet</div>
+                <div style={{ fontSize: 13, color: "#9CA3AF", marginTop: 4 }}>Book your first delivery!</div>
+                <Btn onClick={() => setView("new")} style={{ marginTop: 16 }} variant="primary">Book a Delivery</Btn>
               </Card>
             )}
-            {[...myPackages, ...packages.slice(0, 2)].map(pkg => (
+            {packages.map(pkg => (
               <Card key={pkg.id} style={{ marginBottom: 12, cursor: "pointer" }} onClick={() => setExpandedPkg(expandedPkg === pkg.id ? null : pkg.id)}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#111827", fontFamily: "monospace" }}>{pkg.trackingCode}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#111827", fontFamily: "monospace" }}>{pkg.trackingCode}</div>
                     <div style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>{pkg.description}</div>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
@@ -356,7 +528,7 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
                   </div>
                 </div>
                 <div style={{ fontSize: 12, color: "#9CA3AF" }}>→ {pkg.deliveryAddress}</div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, alignItems: "center" }}>
                   <span style={{ fontSize: 12, color: "#6B7280" }}>KES {pkg.total}</span>
                   <span style={{ fontSize: 12, color: "#DC2626", fontWeight: 700 }}>{expandedPkg === pkg.id ? "▲ Less" : "▼ Details"}</span>
                 </div>
