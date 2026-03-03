@@ -815,7 +815,7 @@ function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onAcceptDel
 // ============================================================
 // ADMIN DASHBOARD
 // ============================================================
-function AdminDashboard({ packages, riders, transitLogs, onDispatch, onAddRider, accounts }) {
+function AdminDashboard({ packages, riders, transitLogs, onDispatch, onAddRider, accounts, currentUser }) {
   const [view, setView] = useState("hub");
   const [selectedPkg, setSelectedPkg] = useState(null);
   const [selectedRider, setSelectedRider] = useState("");
@@ -845,6 +845,30 @@ function AdminDashboard({ packages, riders, transitLogs, onDispatch, onAddRider,
   const [otpInput, setOtpInput] = useState("");
   const [otpError, setOtpError] = useState(false);
 
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount]     = useState(0);
+  const [showBell, setShowBell]           = useState(false);
+
+  useEffect(() => {
+    const ch = supabase.channel('admin-notifs')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'packages' }, ({ new: pkg }) => {
+        const nb = (pkg.tracking_code||'') + ' - ' + (pkg.delivery_zone||'') + ' - KES ' + pkg.total;
+        setNotifications(n => [{ id: pkg.id, type: 'order', title: 'New Order', body: nb, time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) }, ...n].slice(0,50));
+        setUnreadCount(x => x + 1);
+        if (Notification.permission === 'granted') new Notification('New Order - Baruk', { body: nb, icon: '/icon-192.png' });
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'profiles' }, ({ new: p }) => {
+        if (p.id === currentUser?.id) return;
+        const pb = (p.name||'A user') + ' joined as ' + (p.role||'customer');
+        setNotifications(n => [{ id: p.id, type: 'user', title: 'New Sign-up', body: pb, time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) }, ...n].slice(0,50));
+        setUnreadCount(x => x + 1);
+        if (Notification.permission === 'granted') new Notification('New Sign-up - Baruk', { body: pb, icon: '/icon-192.png' });
+      })
+      .subscribe();
+    if (Notification.permission === 'default') Notification.requestPermission();
+    return () => supabase.removeChannel(ch);
+  }, [currentUser]);
+
   const atHub = packages.filter(p => p.status === "at_warehouse");
   const inTransit = packages.filter(p => ["searching_rider","picked_up","out_for_delivery"].includes(p.status));
   const delivered = packages.filter(p => p.status === "delivered");
@@ -869,12 +893,45 @@ function AdminDashboard({ packages, riders, transitLogs, onDispatch, onAddRider,
             <div style={{ fontSize: 11, color: "#9CA3AF" }}>Central Warehouse Operations</div>
           </div>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {[["hub","📦 Hub Inventory"],["riders","🏍️ Riders"],["logs","📋 Custody Logs"],["revenue","💰 Revenue"]].map(([v, l]) => (
             <button key={v} onClick={() => setView(v)} style={{ padding: "6px 14px", border: "none", background: view === v ? "#DC2626" : "#F3F4F6", color: view === v ? "#fff" : "#6B7280", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "inherit" }}>{l}</button>
           ))}
+          <div style={{ position: "relative" }}>
+            <button onClick={() => { setShowBell(s => !s); setUnreadCount(0); }} style={{ position: "relative", width: 38, height: 38, borderRadius: 8, background: unreadCount > 0 ? "#FEF2F2" : "#F3F4F6", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>
+              {"🔔"}
+              {unreadCount > 0 && (<span style={{ position: "absolute", top: 5, right: 5, width: 16, height: 16, background: "#DC2626", borderRadius: "50%", fontSize: 9, color: "#fff", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center" }}>{unreadCount > 9 ? "9+" : unreadCount}</span>)}
+            </button>
+            {showBell && (
+              <div style={{ position: "absolute", right: 0, top: 46, width: 340, background: "#fff", borderRadius: 16, boxShadow: "0 8px 40px rgba(0,0,0,0.15)", border: "1px solid #E5E7EB", zIndex: 9999, overflow: "hidden" }}>
+                <div style={{ padding: "14px 18px", borderBottom: "1px solid #F3F4F6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontWeight: 900, fontSize: 14, color: "#111827" }}>Notifications</span>
+                  {notifications.length > 0 && <button onClick={() => setNotifications([])} style={{ fontSize: 11, color: "#9CA3AF", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>Clear all</button>}
+                </div>
+                {notifications.length === 0 ? (
+                  <div style={{ padding: "32px 20px", textAlign: "center" }}>
+                    <div style={{ fontSize: 36, marginBottom: 8 }}>🔕</div>
+                    <div style={{ fontSize: 13, color: "#9CA3AF", fontWeight: 600 }}>No notifications yet</div>
+                    <div style={{ fontSize: 11, color: "#D1D5DB", marginTop: 4 }}>New orders and sign-ups appear here live</div>
+                  </div>
+                ) : (
+                  <div style={{ maxHeight: 420, overflowY: "auto" }}>
+                    {notifications.map((n, i) => (
+                      <div key={n.id + i} style={{ padding: "13px 18px", borderBottom: "1px solid #F9FAFB", display: "flex", gap: 12, alignItems: "flex-start" }}>
+                        <div style={{ width: 40, height: 40, borderRadius: 10, background: n.type === "order" ? "#FEF2F2" : "#EFF6FF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>{n.type === "order" ? "📦" : "👤"}</div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, fontWeight: 800, color: "#111827" }}>{n.title}</div>
+                          <div style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>{n.body}</div>
+                          <div style={{ fontSize: 10, color: "#9CA3AF", marginTop: 4 }}>{n.time}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
 
       <div style={{ padding: 24 }}>
         {/* Stats Bar */}
@@ -1709,7 +1766,7 @@ export default function App() {
       <TopBar />
       {user.role === "customer" && <CustomerApp packages={packages.filter(p => p.customerId === user.id)} onCreatePackage={onCreatePackage} transitLogs={logs} />}
       {user.role === "rider"    && <RiderApp packages={packages} onAcceptCollection={onAcceptCollection} onMarkAtWarehouse={onMarkAtWarehouse} onAcceptDelivery={onAcceptDelivery} onVerifyOTP={onVerifyOTP} onMarkDelivered={onMarkDelivered} transitLogs={logs} currentRider={user} />}
-      {user.role === "admin"    && <AdminDashboard packages={packages} riders={riders} transitLogs={logs} onDispatch={onDispatch} onAddRider={onAddRider} accounts={[...riders, user]} />}
+      {user.role === "admin"    && <AdminDashboard packages={packages} riders={riders} transitLogs={logs} onDispatch={onDispatch} onAddRider={onAddRider} accounts={[...riders, user]} currentUser={user} />}
       <InstallBanner />
     </div>
   );
