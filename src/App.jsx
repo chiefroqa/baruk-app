@@ -379,7 +379,7 @@ const MPESA_NAME    = "Coral Crafts";
 // ============================================================
 function CustomerApp({ packages, onCreatePackage, transitLogs, riders = [] }) {
   const [view, setView]             = useState("track");
-  const [form, setForm]             = useState({ pickupAddress: "", deliveryAddress: "", deliveryZone: ZONES[0], description: "", size: "small", declaredValue: "" });
+  const [form, setForm]             = useState({ pickupAddress: "", deliveryAddress: "", deliveryZone: ZONES[0], description: "", size: "small", declaredValue: "", recipientName: "", recipientPhone: "" });
   const [expandedPkg, setExpandedPkg] = useState(null);
 
   // Payment flow stages: "form" → "payment" → "confirm" → "done"
@@ -390,7 +390,7 @@ function CustomerApp({ packages, onCreatePackage, transitLogs, riders = [] }) {
   const [submitting, setSubmitting] = useState(false);
 
   const fees = calcFees(parseFloat(form.declaredValue) || 0, form.deliveryZone);
-  const canSubmit = form.pickupAddress && form.deliveryAddress && form.description;
+  const canSubmit = form.pickupAddress && form.deliveryAddress && form.description && form.recipientName && form.recipientPhone;
 
   // Step 1 — customer fills form and clicks Book
   const handleBook = async () => {
@@ -400,7 +400,7 @@ function CustomerApp({ packages, onCreatePackage, transitLogs, riders = [] }) {
     setPendingPkg(pkg);
     setStage("payment");
     setSubmitting(false);
-    setForm({ pickupAddress: "", deliveryAddress: "", deliveryZone: ZONES[0], description: "", size: "small", declaredValue: "" });
+    setForm({ pickupAddress: "", deliveryAddress: "", deliveryZone: ZONES[0], description: "", size: "small", declaredValue: "", recipientName: "", recipientPhone: "" });
   };
 
   // Step 2 — customer pastes their M-Pesa confirmation code
@@ -596,6 +596,13 @@ function CustomerApp({ packages, onCreatePackage, transitLogs, riders = [] }) {
               <Input label="Pickup Address"       value={form.pickupAddress}   onChange={v => setForm(f => ({...f, pickupAddress: v}))}   placeholder="Where should we collect from?" />
               <Input label="Delivery Address"     value={form.deliveryAddress} onChange={v => setForm(f => ({...f, deliveryAddress: v}))} placeholder="Where should we deliver to?" />
 
+              {/* Recipient details */}
+              <div style={{ background: "#F0F9FF", border: "1.5px solid #BAE6FD", borderRadius: 12, padding: "12px 14px", marginBottom: 14 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#0369A1", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>📬 Recipient Details</div>
+                <Input label="Recipient Name"  value={form.recipientName}  onChange={v => setForm(f => ({...f, recipientName: v}))}  placeholder="Who will receive the package?" />
+                <Input label="Recipient Phone" value={form.recipientPhone} onChange={v => setForm(f => ({...f, recipientPhone: v}))} placeholder="e.g. 0712 345 678" type="tel" />
+              </div>
+
               {/* Zone picker with tier grouping */}
               <div style={{ marginBottom: 14 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: "#6B7280", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>Delivery Zone</div>
@@ -691,6 +698,23 @@ function CustomerApp({ packages, onCreatePackage, transitLogs, riders = [] }) {
                 {expandedPkg === pkg.id && (
                   <div style={{ marginTop: 14, borderTop: "1px solid #F3F4F6", paddingTop: 14 }}>
                     <TrackingProgress status={pkg.status} />
+
+                    {/* ── Recipient info ── */}
+                    {(pkg.recipientName || pkg.recipientPhone) && (
+                      <div style={{ marginBottom: 14 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Delivering To</div>
+                        <div style={{ background: "#F0F9FF", border: "1px solid #BAE6FD", borderRadius: 10, padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 800, color: "#111827" }}>{pkg.recipientName}</div>
+                            <div style={{ fontSize: 12, color: "#6B7280", marginTop: 1 }}>{pkg.recipientPhone}</div>
+                          </div>
+                          {pkg.recipientPhone && (
+                            <a href={`tel:${pkg.recipientPhone}`} style={{ background: "#0EA5E9", color: "#fff", padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700, textDecoration: "none" }}>📞 Call</a>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     {(() => {
                       const collRider = pkg.riderCollectionId ? riders.find(r => r.id === pkg.riderCollectionId) : null;
                       const delRider  = pkg.riderDeliveryId   ? riders.find(r => r.id === pkg.riderDeliveryId)   : null;
@@ -798,8 +822,8 @@ function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onCollected
           <span>KES {pkg.declaredValue.toLocaleString()} value</span>
         </div>
 
-        {/* ── Sender contact — shown to collection rider once job accepted ── */}
-        {isMyCollection && pkg.status !== "searching_rider" && (() => {
+        {/* ── Contact block — sender for collection rider, recipient for delivery rider ── */}
+        {isMyCollection && !isMyDelivery && pkg.status !== "searching_rider" && (() => {
           const sender = customers.find(c => c.id === pkg.customerId);
           return sender ? (
             <div style={{ marginTop: 10, background: "#EFF6FF", border: "1.5px solid #BFDBFE", borderRadius: 10, padding: "10px 12px" }}>
@@ -814,6 +838,20 @@ function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onCollected
             </div>
           ) : null;
         })()}
+        {isMyDelivery && (pkg.recipientName || pkg.recipientPhone) && (
+          <div style={{ marginTop: 10, background: "#F0FDF4", border: "1.5px solid #6EE7B7", borderRadius: 10, padding: "10px 12px" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#065F46", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>🏠 Recipient Contact</div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: "#111827" }}>{pkg.recipientName || "—"}</div>
+                <div style={{ fontSize: 12, color: "#6B7280", marginTop: 1 }}>{pkg.recipientPhone || "—"}</div>
+              </div>
+              {pkg.recipientPhone && (
+                <a href={`tel:${pkg.recipientPhone}`} style={{ background: "#10B981", color: "#fff", padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700, textDecoration: "none", flexShrink: 0 }}>📞 Call</a>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Actions — driven by exact status + rider role */}
         <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1816,6 +1854,8 @@ const dbPkgToApp = (p) => ({
   trackingCode:         p.tracking_code,
   customerId:           p.customer_id,
   customerName:         p.customer_name,
+  recipientName:        p.recipient_name,
+  recipientPhone:       p.recipient_phone,
   riderCollectionId:    p.rider_collection_id,
   riderDeliveryId:      p.rider_delivery_id,
   pickupAddress:        p.pickup_address,
@@ -2311,6 +2351,8 @@ export default function App() {
       tracking_code:          trackingCode,
       customer_id:            user.id,
       customer_name:          user.name,
+      recipient_name:         form.recipientName,
+      recipient_phone:        form.recipientPhone,
       pickup_address:         form.pickupAddress,
       delivery_address:       form.deliveryAddress,
       delivery_zone:          form.deliveryZone,
