@@ -907,7 +907,7 @@ function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onCollected
 // ADMIN DASHBOARD
 // ============================================================
 function AdminDashboard({ packages, riders, customers, transitLogs, onDispatch, onAcceptAtWarehouse, onConfirmDelivery, onAddRider, accounts }) {
-  const [view, setView] = useState("requests");
+  const [view, setView] = useState("hub");
   const [selectedPkg, setSelectedPkg] = useState(null);
   const [selectedRider, setSelectedRider] = useState("");
   const [showAddRider, setShowAddRider] = useState(false);
@@ -966,134 +966,213 @@ function AdminDashboard({ packages, riders, customers, transitLogs, onDispatch, 
           </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          {[["requests","📋 Requests"],["hub","📦 Hub Inventory"],["riders","🏍️ Riders"],["customers","👥 Customers"],["logs","📋 Chain of Custody"],["revenue","💰 Revenue"]].map(([v, l]) => (
-            <button key={v} onClick={() => setView(v)} style={{ padding: "6px 14px", border: "none", background: view === v ? "#DC2626" : "#F3F4F6", color: view === v ? "#fff" : "#6B7280", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "inherit" }}>{l}</button>
+          {[
+            ["hub",       "📦 Hub", pendingAcceptance.length + pendingDelivery.length],
+            ["requests",  "📋 Requests", newRequests.length],
+            ["riders",    "🏍️ Riders", 0],
+            ["customers", "👥 Customers", 0],
+            ["logs",      "📋 Custody", 0],
+            ["revenue",   "💰 Revenue", 0],
+          ].map(([v, l, badge]) => (
+            <button key={v} onClick={() => setView(v)} style={{ padding: "6px 14px", border: "none", background: view === v ? "#DC2626" : "#F3F4F6", color: view === v ? "#fff" : "#6B7280", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "inherit", position: "relative" }}>
+              {l}
+              {badge > 0 && <span style={{ position: "absolute", top: -4, right: -4, background: "#F59E0B", color: "#fff", borderRadius: "50%", width: 18, height: 18, fontSize: 10, display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 900 }}>{badge}</span>}
+            </button>
           ))}
         </div>
       </div>
 
       <div style={{ padding: 24 }}>
-        {/* Stats Bar */}
+        {/* Stats Bar — clickable tiles jump to relevant tab */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 10, marginBottom: 24 }}>
           {[
-            { label: "Pending Accept", value: pendingAcceptance.length, sub: "need action", color: "#F59E0B" },
-            { label: "At Hub", value: atHub.length, sub: "ready", color: "#6366F1" },
-            { label: "In Transit", value: inTransit.length, sub: "packages", color: "#EF4444" },
-            { label: "New Requests", value: newRequests.length, sub: "incoming", color: "#0EA5E9" },
-            { label: "Pending Delivery", value: pendingDelivery.length, sub: "to confirm", color: "#F97316" },
-            { label: "Delivered Today", value: delivered.length, sub: "packages", color: "#10B981" },
-            { label: "Customers", value: customers.length, sub: "registered", color: "#7C3AED" },
-            { label: "Revenue", value: `KES ${totalFees.toLocaleString()}`, sub: "collected", color: "#DC2626" },
+            { label: "Pending Accept", value: pendingAcceptance.length, sub: "need action", color: "#F59E0B", tab: "hub", urgent: pendingAcceptance.length > 0 },
+            { label: "At Hub", value: atHub.length, sub: "ready to dispatch", color: "#6366F1", tab: "hub", urgent: false },
+            { label: "In Transit", value: inTransit.length, sub: "packages", color: "#EF4444", tab: "hub", urgent: false },
+            { label: "New Requests", value: newRequests.length, sub: "incoming", color: "#0EA5E9", tab: "requests", urgent: newRequests.length > 0 },
+            { label: "Pending Delivery", value: pendingDelivery.length, sub: "to confirm", color: "#F97316", tab: "hub", urgent: pendingDelivery.length > 0 },
+            { label: "Delivered Today", value: delivered.length, sub: "packages", color: "#10B981", tab: "logs", urgent: false },
+            { label: "Customers", value: customers.length, sub: "registered", color: "#7C3AED", tab: "customers", urgent: false },
+            { label: "Revenue", value: `KES ${totalFees.toLocaleString()}`, sub: "collected", color: "#DC2626", tab: "revenue", urgent: false },
           ].map(s => (
-            <Card key={s.label} style={{ textAlign: "center" }}>
-              <Stat {...s} />
-            </Card>
+            <div key={s.label} onClick={() => setView(s.tab)} style={{ cursor: "pointer" }}>
+              <Card style={{ textAlign: "center", border: s.urgent ? `2px solid ${s.color}` : "none", transition: "box-shadow 0.15s", boxShadow: s.urgent ? `0 0 0 3px ${s.color}22` : undefined }}
+                onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
+                onMouseLeave={e => e.currentTarget.style.transform = "none"}>
+                <Stat {...s} />
+                {s.urgent && <div style={{ fontSize: 9, fontWeight: 800, color: s.color, textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 4 }}>● ACTION NEEDED</div>}
+              </Card>
+            </div>
           ))}
         </div>
 
         {view === "hub" && (
           <div>
-            {/* ── SECTION 1: Pending Warehouse Acceptance ── */}
-            {pendingAcceptance.length > 0 && (
-              <div style={{ marginBottom: 28 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#F59E0B", boxShadow: "0 0 0 3px rgba(245,158,11,0.2)" }} />
-                  <div style={{ fontSize: 16, fontWeight: 800, color: "#92400E" }}>Awaiting Acceptance — {pendingAcceptance.length} Package{pendingAcceptance.length > 1 ? "s" : ""}</div>
-                  <span style={{ background: "#FEF3C7", color: "#92400E", padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>ACTION REQUIRED</span>
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 14 }}>
+            {/* ── SECTION 1: Pending Warehouse Acceptance — always visible ── */}
+            <div style={{ marginBottom: 28 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                <div style={{ width: 10, height: 10, borderRadius: "50%", background: pendingAcceptance.length > 0 ? "#F59E0B" : "#D1D5DB", boxShadow: pendingAcceptance.length > 0 ? "0 0 0 3px rgba(245,158,11,0.2)" : "none" }} />
+                <div style={{ fontSize: 16, fontWeight: 800, color: pendingAcceptance.length > 0 ? "#92400E" : "#6B7280" }}>Awaiting Warehouse Acceptance — {pendingAcceptance.length} Package{pendingAcceptance.length !== 1 ? "s" : ""}</div>
+                {pendingAcceptance.length > 0 && <span style={{ background: "#FEF3C7", color: "#92400E", padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>ACTION REQUIRED</span>}
+              </div>
+              {pendingAcceptance.length === 0 ? (
+                <Card style={{ textAlign: "center", padding: "20px", background: "#F9FAFB", border: "1px dashed #E5E7EB" }}>
+                  <div style={{ fontSize: 13, color: "#9CA3AF" }}>✅ No packages awaiting warehouse acceptance right now</div>
+                </Card>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))", gap: 14 }}>
                   {pendingAcceptance.map(pkg => {
                     const collectionRider = riders.find(r => r.id === pkg.riderCollectionId);
                     return (
                       <Card key={pkg.id} style={{ border: "2px solid #FDE68A", background: "#FFFBEB" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                        {/* Header */}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
                           <div>
-                            <div style={{ fontFamily: "monospace", fontWeight: 800, fontSize: 14, color: "#111827" }}>{pkg.trackingCode}</div>
-                            <div style={{ fontSize: 13, color: "#374151", marginTop: 2 }}>{pkg.description}</div>
+                            <div style={{ fontFamily: "monospace", fontWeight: 900, fontSize: 15, color: "#111827" }}>{pkg.trackingCode}</div>
+                            <div style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>Rider arrived — physical inspection required</div>
                           </div>
                           <StatusBadge status={pkg.status} />
                         </div>
-                        <div style={{ background: "#fff", borderRadius: 10, padding: "10px 12px", marginBottom: 12 }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
-                            <span style={{ color: "#6B7280" }}>Customer</span>
+
+                        {/* Inspection checklist header */}
+                        <div style={{ background: "#FEF9C3", border: "1px solid #FDE68A", borderRadius: 8, padding: "8px 12px", marginBottom: 12, fontSize: 12, color: "#713F12", fontWeight: 700 }}>
+                          ⚠️ Verify the following before accepting:
+                        </div>
+
+                        {/* Package details for verification */}
+                        <div style={{ background: "#fff", borderRadius: 10, padding: "12px 14px", marginBottom: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                            <span style={{ color: "#6B7280", fontWeight: 600 }}>Description</span>
+                            <span style={{ fontWeight: 800, color: "#111827" }}>{pkg.description}</span>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                            <span style={{ color: "#6B7280", fontWeight: 600 }}>Size</span>
+                            <span style={{ fontWeight: 700, color: "#374151", textTransform: "capitalize" }}>{pkg.size}</span>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                            <span style={{ color: "#6B7280", fontWeight: 600 }}>Declared Value</span>
+                            <span style={{ fontWeight: 800, color: pkg.isHighValue ? "#DC2626" : "#111827" }}>KES {pkg.declaredValue.toLocaleString()}</span>
+                          </div>
+                          <div style={{ height: 1, background: "#F3F4F6" }} />
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                            <span style={{ color: "#6B7280", fontWeight: 600 }}>Customer</span>
                             <span style={{ fontWeight: 700, color: "#111827" }}>{pkg.customerName}</span>
                           </div>
-                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
-                            <span style={{ color: "#6B7280" }}>Brought by</span>
-                            <span style={{ fontWeight: 700, color: "#DC2626" }}>🏍️ {collectionRider?.name || "Unknown Rider"}</span>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                            <span style={{ color: "#6B7280", fontWeight: 600 }}>Pickup from</span>
+                            <span style={{ fontWeight: 600, color: "#374151", textAlign: "right", maxWidth: 180 }}>{pkg.pickupAddress}</span>
                           </div>
-                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
-                            <span style={{ color: "#6B7280" }}>Destination</span>
-                            <span style={{ fontWeight: 700, color: "#374151" }}>{pkg.deliveryZone}</span>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                            <span style={{ color: "#6B7280", fontWeight: 600 }}>Delivering to</span>
+                            <span style={{ fontWeight: 600, color: "#374151", textAlign: "right", maxWidth: 180 }}>{pkg.deliveryAddress}</span>
                           </div>
-                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-                            <span style={{ color: "#6B7280" }}>Declared Value</span>
-                            <span style={{ fontWeight: 700, color: "#111827" }}>KES {pkg.declaredValue.toLocaleString()}</span>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                            <span style={{ color: "#6B7280", fontWeight: 600 }}>Destination Zone</span>
+                            {(() => { const t = TIER_BADGE[getZoneInfo(pkg.deliveryZone).tier]; return <span style={{ background: t.bg, color: t.color, padding: "2px 8px", borderRadius: 12, fontSize: 12, fontWeight: 700 }}>{pkg.deliveryZone}</span>; })()}
                           </div>
+                          <div style={{ height: 1, background: "#F3F4F6" }} />
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                            <span style={{ color: "#6B7280", fontWeight: 600 }}>Brought by rider</span>
+                            <span style={{ fontWeight: 800, color: "#DC2626" }}>🏍️ {collectionRider?.name || "Unknown"}</span>
+                          </div>
+                          {collectionRider?.phone && (
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                              <span style={{ color: "#6B7280", fontWeight: 600 }}>Rider phone</span>
+                              <a href={`tel:${collectionRider.phone}`} style={{ fontWeight: 700, color: "#0EA5E9", textDecoration: "none" }}>{collectionRider.phone}</a>
+                            </div>
+                          )}
                         </div>
-                        {pkg.isHighValue && <div style={{ marginBottom: 10 }}><HighValueBadge /></div>}
+
+                        {/* Flags */}
+                        {(pkg.isHighValue || pkg.protectionFee > 0) && (
+                          <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+                            {pkg.isHighValue && <HighValueBadge />}
+                            {pkg.protectionFee > 0 && <span style={{ background: "#FEF3C7", color: "#92400E", padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>🛡️ INSURED — KES {pkg.protectionFee}</span>}
+                          </div>
+                        )}
+
                         <Btn onClick={() => onAcceptAtWarehouse(pkg.id)} variant="success" style={{ width: "100%" }}>
-                          ✅ Accept Package at Warehouse
+                          ✅ Condition Verified — Accept Package
                         </Btn>
                       </Card>
                     );
                   })}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
-            {/* ── SECTION 1.5: Pending Delivery Confirmation ── */}
-            {pendingDelivery.length > 0 && (
-              <div style={{ marginBottom: 28 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#F97316", boxShadow: "0 0 0 3px rgba(249,115,22,0.2)" }} />
-                  <div style={{ fontSize: 16, fontWeight: 800, color: "#9A3412" }}>Delivery Confirmations — {pendingDelivery.length} Package{pendingDelivery.length !== 1 ? "s" : ""}</div>
-                  <span style={{ background: "#FFF7ED", color: "#9A3412", padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>ACTION REQUIRED</span>
+            {/* ── SECTION 1.5: Pending Delivery Confirmation — always visible ── */}
+            <div style={{ marginBottom: 28 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                <div style={{ width: 10, height: 10, borderRadius: "50%", background: pendingDelivery.length > 0 ? "#F97316" : "#D1D5DB", boxShadow: pendingDelivery.length > 0 ? "0 0 0 3px rgba(249,115,22,0.2)" : "none" }} />
+                <div style={{ fontSize: 16, fontWeight: 800, color: pendingDelivery.length > 0 ? "#9A3412" : "#6B7280" }}>
+                  Pending Delivery Confirmation — {pendingDelivery.length} Package{pendingDelivery.length !== 1 ? "s" : ""}
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 14 }}>
+                {pendingDelivery.length > 0 && <span style={{ background: "#FFF7ED", color: "#9A3412", padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>ACTION REQUIRED</span>}
+              </div>
+              {pendingDelivery.length === 0 ? (
+                <Card style={{ textAlign: "center", padding: "20px", background: "#F9FAFB", border: "1px dashed #E5E7EB" }}>
+                  <div style={{ fontSize: 13, color: "#9CA3AF" }}>✅ No deliveries pending confirmation right now</div>
+                </Card>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 14 }}>
                   {pendingDelivery.map(pkg => {
                     const deliveryRider = riders.find(r => r.id === pkg.riderDeliveryId);
                     const pkgLogs = transitLogs.filter(l => l.packageId === pkg.id);
                     const reportedLog = [...pkgLogs].reverse().find(l => l.event === "DELIVERY_REPORTED");
                     return (
                       <Card key={pkg.id} style={{ border: "2px solid #FED7AA", background: "#FFF7ED" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
                           <div>
-                            <div style={{ fontFamily: "monospace", fontWeight: 800, fontSize: 14, color: "#111827" }}>{pkg.trackingCode}</div>
-                            <div style={{ fontSize: 13, color: "#374151", marginTop: 2 }}>{pkg.description}</div>
+                            <div style={{ fontFamily: "monospace", fontWeight: 900, fontSize: 15, color: "#111827" }}>{pkg.trackingCode}</div>
+                            <div style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>Rider reported delivery — confirm to close</div>
                           </div>
                           <StatusBadge status={pkg.status} />
                         </div>
-                        <div style={{ background: "#fff", borderRadius: 10, padding: "10px 12px", marginBottom: 12 }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
-                            <span style={{ color: "#6B7280" }}>Customer</span>
+                        <div style={{ background: "#fff", borderRadius: 10, padding: "12px 14px", marginBottom: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                            <span style={{ color: "#6B7280", fontWeight: 600 }}>Description</span>
+                            <span style={{ fontWeight: 700, color: "#111827" }}>{pkg.description}</span>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                            <span style={{ color: "#6B7280", fontWeight: 600 }}>Customer</span>
                             <span style={{ fontWeight: 700, color: "#111827" }}>{pkg.customerName}</span>
                           </div>
-                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
-                            <span style={{ color: "#6B7280" }}>Delivered by</span>
-                            <span style={{ fontWeight: 700, color: "#DC2626" }}>🏍️ {deliveryRider?.name || "Unknown Rider"}</span>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                            <span style={{ color: "#6B7280", fontWeight: 600 }}>Delivered to</span>
+                            <span style={{ fontWeight: 600, color: "#374151", textAlign: "right", maxWidth: 180 }}>{pkg.deliveryAddress}</span>
                           </div>
-                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
-                            <span style={{ color: "#6B7280" }}>Delivered to</span>
-                            <span style={{ fontWeight: 700, color: "#374151" }}>{pkg.deliveryAddress}</span>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                            <span style={{ color: "#6B7280", fontWeight: 600 }}>Delivery rider</span>
+                            <span style={{ fontWeight: 800, color: "#DC2626" }}>🏍️ {deliveryRider?.name || "Unknown"}</span>
+                          </div>
+                          {deliveryRider?.phone && (
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                              <span style={{ color: "#6B7280", fontWeight: 600 }}>Rider phone</span>
+                              <a href={`tel:${deliveryRider.phone}`} style={{ fontWeight: 700, color: "#0EA5E9", textDecoration: "none" }}>{deliveryRider.phone}</a>
+                            </div>
+                          )}
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                            <span style={{ color: "#6B7280", fontWeight: 600 }}>Declared value</span>
+                            <span style={{ fontWeight: 800, color: pkg.isHighValue ? "#DC2626" : "#111827" }}>KES {pkg.declaredValue.toLocaleString()}</span>
                           </div>
                           {reportedLog && (
-                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-                              <span style={{ color: "#6B7280" }}>Reported at</span>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                              <span style={{ color: "#6B7280", fontWeight: 600 }}>Reported at</span>
                               <span style={{ fontWeight: 600, color: "#374151" }}>{new Date(reportedLog.createdAt).toLocaleString()}</span>
                             </div>
                           )}
                         </div>
                         {pkg.isHighValue && <div style={{ marginBottom: 10 }}><HighValueBadge /></div>}
                         <Btn onClick={() => onConfirmDelivery(pkg.id)} variant="success" style={{ width: "100%" }}>
-                          ✅ Confirm Delivery
+                          ✅ Confirm Delivery Complete
                         </Btn>
                       </Card>
                     );
                   })}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* ── SECTION 2: Hub Inventory — Needs Rider Assignment ── */}
             <div style={{ marginBottom: 28 }}>
