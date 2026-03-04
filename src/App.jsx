@@ -738,6 +738,13 @@ function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onCollected
     const isMyDelivery = pkg.riderDeliveryId === rider.id;
     const needsWarehouseOTP = pkg.isHighValue && isMyCollection && pkg.status === "at_warehouse" && !pkg.otpWarehouseVerified;
     const needsDeliveryOTP = pkg.isHighValue && isMyDelivery && pkg.status === "out_for_delivery" && !pkg.otpDeliveryVerified;
+    const [busy, setBusy] = useState(false);
+
+    const doAction = async (fn) => {
+      if (busy) return;
+      setBusy(true);
+      try { await fn(); } finally { setBusy(false); }
+    };
 
     return (
       <Card style={{ marginBottom: 12 }}>
@@ -763,7 +770,7 @@ function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onCollected
 
           {/* ── COLLECTION SIDE ── */}
           {pkg.status === "searching_rider" && !isMyCollection && (
-            <Btn onClick={() => onAcceptCollection(pkg.id, rider.id)} variant="primary">📦 Accept Collection Job</Btn>
+            <Btn onClick={() => doAction(() => onAcceptCollection(pkg.id, rider.id))} variant="primary" disabled={busy}>{busy ? "Accepting…" : "📦 Accept Collection Job"}</Btn>
           )}
           {pkg.status === "searching_rider" && isMyCollection && (
             <div style={{ background: "#FEF3C7", border: "1.5px solid #FDE68A", borderRadius: 10, padding: "10px 12px" }}>
@@ -772,7 +779,7 @@ function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onCollected
             </div>
           )}
           {pkg.status === "picked_up" && isMyCollection && (
-            <Btn onClick={() => onMarkAtWarehouse(pkg.id)} variant="success">🏭 Arrived at Warehouse</Btn>
+            <Btn onClick={() => doAction(() => onMarkAtWarehouse(pkg.id))} variant="success" disabled={busy}>{busy ? "Saving…" : "🏭 Arrived at Warehouse"}</Btn>
           )}
           {pkg.status === "pending_warehouse" && isMyCollection && (
             <div style={{ background: "#EEF2FF", border: "1.5px solid #C7D2FE", borderRadius: 10, padding: "10px 12px" }}>
@@ -802,7 +809,7 @@ function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onCollected
 
           {/* ── DELIVERY SIDE ── */}
           {pkg.status === "at_warehouse" && isMyDelivery && (
-            <Btn onClick={() => onCollectedFromWarehouse(pkg.id)} variant="primary">🏍️ Collected from Hub — Out for Delivery</Btn>
+            <Btn onClick={() => doAction(() => onCollectedFromWarehouse(pkg.id))} variant="primary" disabled={busy}>{busy ? "Saving…" : "🏍️ Collected from Hub — Out for Delivery"}</Btn>
           )}
           {pkg.status === "out_for_delivery" && isMyDelivery && (
             needsDeliveryOTP ? (
@@ -816,7 +823,7 @@ function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onCollected
                 {otpError[`${pkg.id}-delivery`] && <div style={{ color: "#EF4444", fontSize: 12, marginTop: 6 }}>❌ Incorrect OTP. Try again.</div>}
               </div>
             ) : (
-              <Btn onClick={() => onMarkDelivered(pkg.id)} variant="success">🎉 Mark as Delivered</Btn>
+              <Btn onClick={() => doAction(() => onMarkDelivered(pkg.id))} variant="success" disabled={busy}>{busy ? "Saving…" : "🎉 Mark as Delivered"}</Btn>
             )
           )}
           {pkg.status === "pending_delivery" && isMyDelivery && (
@@ -903,6 +910,33 @@ function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onCollected
   );
 }
 
+// ── Stateful admin action buttons ──
+const AcceptWarehouseBtn = ({ pkgId, onAcceptAtWarehouse }) => {
+  const [busy, setBusy] = useState(false);
+  const handle = async () => {
+    setBusy(true);
+    try { await onAcceptAtWarehouse(pkgId); } finally { setBusy(false); }
+  };
+  return (
+    <Btn onClick={handle} variant="success" disabled={busy} style={{ width: "100%" }}>
+      {busy ? "⏳ Accepting…" : "✅ Condition Verified — Accept Package"}
+    </Btn>
+  );
+};
+
+const ConfirmDeliveryBtn = ({ pkgId, onConfirmDelivery }) => {
+  const [busy, setBusy] = useState(false);
+  const handle = async () => {
+    setBusy(true);
+    try { await onConfirmDelivery(pkgId); } finally { setBusy(false); }
+  };
+  return (
+    <Btn onClick={handle} variant="success" disabled={busy} style={{ width: "100%" }}>
+      {busy ? "⏳ Confirming…" : "✅ Confirm Delivery Complete"}
+    </Btn>
+  );
+};
+
 // ============================================================
 // ADMIN DASHBOARD
 // ============================================================
@@ -947,11 +981,17 @@ function AdminDashboard({ packages, riders, customers, transitLogs, onDispatch, 
   const totalFees = packages.reduce((s, p) => s + p.total, 0);
   const totalValue = inTransit.reduce((s, p) => s + p.declaredValue, 0);
 
-  const handleDispatch = (pkg) => {
-    if (!selectedRider) return;
-    onDispatch(pkg.id, selectedRider);
-    setSelectedPkg(null);
-    setSelectedRider("");
+  const [dispatching, setDispatching] = useState(false);
+  const handleDispatch = async (pkg) => {
+    if (!selectedRider || dispatching) return;
+    setDispatching(true);
+    try {
+      await onDispatch(pkg.id, selectedRider);
+      setSelectedPkg(null);
+      setSelectedRider("");
+    } finally {
+      setDispatching(false);
+    }
   };
 
   return (
@@ -1091,9 +1131,7 @@ function AdminDashboard({ packages, riders, customers, transitLogs, onDispatch, 
                           </div>
                         )}
 
-                        <Btn onClick={() => onAcceptAtWarehouse(pkg.id)} variant="success" style={{ width: "100%" }}>
-                          ✅ Condition Verified — Accept Package
-                        </Btn>
+                        <AcceptWarehouseBtn pkgId={pkg.id} onAcceptAtWarehouse={onAcceptAtWarehouse} />
                       </Card>
                     );
                   })}
@@ -1164,9 +1202,7 @@ function AdminDashboard({ packages, riders, customers, transitLogs, onDispatch, 
                           )}
                         </div>
                         {pkg.isHighValue && <div style={{ marginBottom: 10 }}><HighValueBadge /></div>}
-                        <Btn onClick={() => onConfirmDelivery(pkg.id)} variant="success" style={{ width: "100%" }}>
-                          ✅ Confirm Delivery Complete
-                        </Btn>
+                        <ConfirmDeliveryBtn pkgId={pkg.id} onConfirmDelivery={onConfirmDelivery} />
                       </Card>
                     );
                   })}
@@ -1219,7 +1255,7 @@ function AdminDashboard({ packages, riders, customers, transitLogs, onDispatch, 
                                   : riders.map(r => <option key={r.id} value={r.id}>{r.name} ({r.zone})</option>)}
                               </select>
                               <div style={{ display: "flex", gap: 6 }}>
-                                <Btn onClick={() => handleDispatch(pkg)} variant="success" size="sm" disabled={!selectedRider}>🚀 Dispatch</Btn>
+                                <Btn onClick={() => handleDispatch(pkg)} variant="success" size="sm" disabled={!selectedRider || dispatching}>{dispatching ? "Saving…" : "🚀 Dispatch"}</Btn>
                                 <Btn onClick={() => { setSelectedPkg(null); setSelectedRider(""); }} variant="ghost" size="sm">Cancel</Btn>
                               </div>
                             </div>
@@ -2102,25 +2138,49 @@ export default function App() {
     setUser(null);
   };
 
-  // ── Add log entry to DB ──
+  // ── Add log entry to DB + immediately append to local state ──
   const addLog = async (packageId, actorId, actorRole, actorName, event, location, notes = null) => {
-    await supabase.from("transit_logs").insert({
+    const optimisticLog = {
+      id: `local-${Date.now()}`,
+      packageId, actorId, actorRole, actorName, event, location, notes,
+      createdAt: new Date().toISOString(),
+    };
+    setLogs(prev => [...prev, optimisticLog]);
+
+    const { error } = await supabase.from("transit_logs").insert({
       package_id: packageId, actor_id: actorId, actor_role: actorRole,
       actor_name: actorName, event, location, notes,
     });
+    if (error) {
+      console.error("addLog failed:", error);
+      // Remove optimistic log on failure
+      setLogs(prev => prev.filter(l => l.id !== optimisticLog.id));
+    }
   };
 
-  // ── Update package in DB ──
+  // ── Update package in DB + immediately reflect in local state ──
   const updatePkg = async (id, updates) => {
-    // Convert camelCase app fields back to snake_case for DB
+    // 1. Optimistically update local state immediately so UI responds
+    setPackages(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+
+    // 2. Write to Supabase
     const dbUpdates = {};
     if (updates.status               !== undefined) dbUpdates.status                    = updates.status;
     if (updates.riderCollectionId    !== undefined) dbUpdates.rider_collection_id        = updates.riderCollectionId;
     if (updates.riderDeliveryId      !== undefined) dbUpdates.rider_delivery_id          = updates.riderDeliveryId;
     if (updates.otpWarehouseVerified !== undefined) dbUpdates.otp_warehouse_verified     = updates.otpWarehouseVerified;
     if (updates.otpDeliveryVerified  !== undefined) dbUpdates.otp_delivery_verified      = updates.otpDeliveryVerified;
-    await supabase.from("packages").update(dbUpdates).eq("id", id);
-    // Realtime will trigger loadPackages() automatically
+
+    const { error } = await supabase.from("packages").update(dbUpdates).eq("id", id);
+    if (error) {
+      // Roll back optimistic update and alert
+      console.error("updatePkg failed:", error);
+      await loadPackages(); // re-sync from DB
+      alert(`Error saving update: ${error.message}
+
+Check Supabase RLS policies — the rider/admin may not have UPDATE permission on the packages table.`);
+    }
+    // Realtime will also trigger loadPackages() on success
   };
 
   // ── Create new package ──
@@ -2153,7 +2213,7 @@ export default function App() {
   const onAcceptCollection = async (pkgId, riderId) => {
     const pkg = packages.find(p => p.id === pkgId);
     await updatePkg(pkgId, { riderCollectionId: riderId, status: "picked_up" });
-    await addLog(pkgId, riderId, "rider", user.name, "COLLECTED_FROM_CUSTOMER", pkg?.pickupAddress, "Package collected");
+    await addLog(pkgId, user.id, "rider", user.name, "COLLECTED_FROM_CUSTOMER", pkg?.pickupAddress, "Package collected from customer");
   };
 
   const onMarkAtWarehouse = async (pkgId) => {
@@ -2165,33 +2225,28 @@ export default function App() {
   const onAcceptAtWarehouse = async (pkgId) => {
     const pkg = packages.find(p => p.id === pkgId);
     await updatePkg(pkgId, { status: "at_warehouse" });
-    await addLog(pkgId, user.id, "admin", user.name, "WAREHOUSE_ACCEPTED", "Baruk Central, CBD", "Package received and logged at hub");
+    await addLog(pkgId, user.id, "admin", user.name, "WAREHOUSE_ACCEPTED", "Baruk Central, CBD", "Condition verified — package accepted at hub");
   };
 
-  // ── Rider confirms they collected from warehouse before delivery ──
+  // ── Rider confirms they collected from warehouse ──
   const onCollectedFromWarehouse = async (pkgId) => {
     const pkg = packages.find(p => p.id === pkgId);
     await updatePkg(pkgId, { status: "out_for_delivery" });
-    await addLog(pkgId, user.id, "rider", user.name, "COLLECTED_FROM_WAREHOUSE", "Baruk Central, CBD", "Package collected, heading to customer");
+    await addLog(pkgId, user.id, "rider", user.name, "COLLECTED_FROM_WAREHOUSE", "Baruk Central, CBD", "Package collected from hub — heading to customer");
   };
 
   const onDispatch = async (pkgId, riderId) => {
     const rider = riders.find(r => r.id === riderId);
-    // Keep at_warehouse — rider must physically collect before going out
-    await updatePkg(pkgId, { riderDeliveryId: riderId, status: "at_warehouse" });
-    await addLog(pkgId, user.id, "admin", user.name, "DISPATCHED_TO_RIDER", "Baruk Central, CBD", `Assigned to ${rider?.name} — awaiting collection`);
-  };
-
-  const onAcceptDelivery = async (pkgId, riderId) => {
+    // status stays at_warehouse — rider must physically collect before going out
     await updatePkg(pkgId, { riderDeliveryId: riderId });
-    await addLog(pkgId, riderId, "rider", user.name, "ACCEPTED_DELIVERY_JOB", "Baruk Central, CBD");
+    await addLog(pkgId, user.id, "admin", user.name, "DISPATCHED_TO_RIDER", "Baruk Central, CBD", `Assigned to ${rider?.name || riderId} — awaiting collection from hub`);
   };
 
   const onVerifyOTP = async (pkgId, type) => {
     const pkg = packages.find(p => p.id === pkgId);
     if (type === "warehouse") {
       await updatePkg(pkgId, { otpWarehouseVerified: true });
-      await addLog(pkgId, user.id, "rider", user.name, "OTP_WAREHOUSE_VERIFIED", "Baruk Central, CBD", "High-value handoff confirmed");
+      await addLog(pkgId, user.id, "rider", user.name, "OTP_WAREHOUSE_VERIFIED", "Baruk Central, CBD", "High-value handoff OTP confirmed");
     } else {
       await updatePkg(pkgId, { otpDeliveryVerified: true });
       await addLog(pkgId, user.id, "rider", user.name, "OTP_DELIVERY_VERIFIED", pkg?.deliveryAddress, "High-value delivery OTP confirmed");
@@ -2201,14 +2256,14 @@ export default function App() {
   const onMarkDelivered = async (pkgId) => {
     const pkg = packages.find(p => p.id === pkgId);
     await updatePkg(pkgId, { status: "pending_delivery" });
-    await addLog(pkgId, user.id, "rider", user.name, "DELIVERY_REPORTED", pkg?.deliveryAddress, "Rider reports package delivered — awaiting admin confirmation");
+    await addLog(pkgId, user.id, "rider", user.name, "DELIVERY_REPORTED", pkg?.deliveryAddress || "Customer address", "Rider reports package delivered — awaiting admin confirmation");
   };
 
   // ── Admin confirms final delivery ──
   const onConfirmDelivery = async (pkgId) => {
     const pkg = packages.find(p => p.id === pkgId);
     await updatePkg(pkgId, { status: "delivered" });
-    await addLog(pkgId, user.id, "admin", user.name, "DELIVERY_CONFIRMED", pkg?.deliveryAddress, "Delivery confirmed by admin");
+    await addLog(pkgId, user.id, "admin", user.name, "DELIVERY_CONFIRMED", pkg?.deliveryAddress || "Customer address", "Delivery confirmed by admin");
   };
 
   // ── Admin creates rider account ──
