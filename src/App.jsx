@@ -250,12 +250,14 @@ const RIDERS = [
 // ============================================================
 const StatusBadge = ({ status }) => {
   const config = {
-    searching_rider: { label: "Searching Rider", color: "#F59E0B", bg: "#FEF3C7" },
-    picked_up:       { label: "Picked Up", color: "#F87171", bg: "#FEF2F2" },
-    at_warehouse:    { label: "At Warehouse", color: "#8B5CF6", bg: "#EDE9FE" },
-    out_for_delivery:{ label: "Out for Delivery", color: "#10B981", bg: "#D1FAE5" },
-    delivered:       { label: "Delivered", color: "#059669", bg: "#ECFDF5" },
-    cancelled:       { label: "Cancelled", color: "#EF4444", bg: "#FEE2E2" },
+    searching_rider:          { label: "Searching Rider",      color: "#F59E0B", bg: "#FEF3C7" },
+    picked_up:                { label: "Collected",            color: "#F87171", bg: "#FEF2F2" },
+    pending_warehouse:        { label: "Pending Acceptance",   color: "#8B5CF6", bg: "#EDE9FE" },
+    at_warehouse:             { label: "At Warehouse",         color: "#6366F1", bg: "#EEF2FF" },
+    out_for_delivery:         { label: "Out for Delivery",     color: "#10B981", bg: "#D1FAE5" },
+    collected_by_rider:       { label: "Collected by Rider",   color: "#0EA5E9", bg: "#E0F2FE" },
+    delivered:                { label: "Delivered ✓",          color: "#059669", bg: "#ECFDF5" },
+    cancelled:                { label: "Cancelled",            color: "#EF4444", bg: "#FEE2E2" },
   };
   const c = config[status] || { label: status, color: "#6B7280", bg: "#F3F4F6" };
   return (
@@ -323,22 +325,41 @@ const Stat = ({ label, value, sub, color = "#DC2626" }) => (
   </div>
 );
 
+const EVENT_META = {
+  ORDER_PLACED:              { icon: "📋", color: "#6B7280", label: "Order Placed" },
+  COLLECTED_FROM_CUSTOMER:   { icon: "📦", color: "#F59E0B", label: "Collected from Customer" },
+  ARRIVED_AT_WAREHOUSE:      { icon: "🏭", color: "#8B5CF6", label: "Arrived at Warehouse" },
+  WAREHOUSE_ACCEPTED:        { icon: "✅", color: "#10B981", label: "Accepted at Warehouse" },
+  DISPATCHED_TO_RIDER:       { icon: "🚀", color: "#DC2626", label: "Dispatched to Rider" },
+  COLLECTED_FROM_WAREHOUSE:  { icon: "🏍️", color: "#0EA5E9", label: "Collected from Warehouse" },
+  OUT_FOR_DELIVERY:          { icon: "🏍️", color: "#0EA5E9", label: "Out for Delivery" },
+  DELIVERED:                 { icon: "🎉", color: "#059669", label: "Delivered!" },
+  OTP_WAREHOUSE_VERIFIED:    { icon: "🔐", color: "#7C3AED", label: "OTP Verified (Warehouse)" },
+  OTP_DELIVERY_VERIFIED:     { icon: "🔐", color: "#7C3AED", label: "OTP Verified (Delivery)" },
+};
+
 const Timeline = ({ logs }) => (
   <div style={{ position: "relative" }}>
-    {logs.map((log, i) => (
-      <div key={log.id} style={{ display: "flex", gap: 12, marginBottom: i < logs.length - 1 ? 16 : 0 }}>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-          <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#DC2626", marginTop: 4, flexShrink: 0 }} />
-          {i < logs.length - 1 && <div style={{ width: 2, flex: 1, background: "#E5E7EB", marginTop: 4 }} />}
+    {logs.map((log, i) => {
+      const meta = EVENT_META[log.event] || { icon: "•", color: "#9CA3AF", label: log.event.replace(/_/g, " ") };
+      const isLast = i === logs.length - 1;
+      return (
+        <div key={log.id} style={{ display: "flex", gap: 12, marginBottom: isLast ? 0 : 4 }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
+            <div style={{ width: 32, height: 32, borderRadius: "50%", background: isLast ? meta.color : "#F3F4F6", border: `2px solid ${meta.color}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0 }}>
+              {meta.icon}
+            </div>
+            {!isLast && <div style={{ width: 2, flex: 1, background: "#E5E7EB", minHeight: 20, margin: "4px 0" }} />}
+          </div>
+          <div style={{ paddingBottom: isLast ? 0 : 16, paddingTop: 4 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>{meta.label}</div>
+            <div style={{ fontSize: 12, color: "#6B7280" }}>{log.actorName} • {log.location}</div>
+            <div style={{ fontSize: 11, color: "#9CA3AF" }}>{new Date(log.createdAt).toLocaleString()}</div>
+            {log.notes && <div style={{ fontSize: 12, color: meta.color, marginTop: 2, fontStyle: "italic" }}>{log.notes}</div>}
+          </div>
         </div>
-        <div style={{ paddingBottom: i < logs.length - 1 ? 16 : 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>{log.event.replace(/_/g, " ")}</div>
-          <div style={{ fontSize: 12, color: "#6B7280" }}>{log.actorName} • {log.location}</div>
-          <div style={{ fontSize: 11, color: "#9CA3AF" }}>{new Date(log.createdAt).toLocaleString()}</div>
-          {log.notes && <div style={{ fontSize: 12, color: "#DC2626", marginTop: 2, fontStyle: "italic" }}>"{log.notes}"</div>}
-        </div>
-      </div>
-    ))}
+      );
+    })}
   </div>
 );
 
@@ -396,22 +417,27 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
   };
 
   const TrackingProgress = ({ status }) => {
-    const steps  = ["searching_rider","picked_up","at_warehouse","out_for_delivery","delivered"];
-    const labels = ["Searching","Picked Up","At Hub","On the Way","Delivered"];
-    const idx    = steps.indexOf(status);
+    const steps  = ["searching_rider","picked_up","pending_warehouse","at_warehouse","out_for_delivery","delivered"];
+    const labels = ["Searching","Collected","At Hub","Dispatched","On the Way","Delivered"];
+    const icons  = ["🔍","📦","🏭","🚀","🏍️","✅"];
+    // map status to step index — pending_warehouse and at_warehouse both count as step 2
+    const statusIdx = steps.indexOf(status);
+    const idx = statusIdx === -1 ? 0 : statusIdx;
     return (
-      <div style={{ display: "flex", alignItems: "center", margin: "16px 0" }}>
-        {steps.map((s, i) => (
-          <div key={s} style={{ display: "flex", alignItems: "center", flex: 1 }}>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
-              <div style={{ width: 24, height: 24, borderRadius: "50%", background: i <= idx ? "#DC2626" : "#E5E7EB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: i <= idx ? "#fff" : "#9CA3AF", fontWeight: 700, flexShrink: 0 }}>
-                {i < idx ? "✓" : i + 1}
+      <div style={{ margin: "16px 0" }}>
+        <div style={{ display: "flex", alignItems: "flex-start" }}>
+          {["Searching","Collected","At Hub","Dispatched","On the Way","Delivered"].map((label, i) => (
+            <div key={label} style={{ display: "flex", alignItems: "center", flex: 1 }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
+                <div style={{ width: 28, height: 28, borderRadius: "50%", background: i < idx ? "#DC2626" : i === idx ? "#DC2626" : "#E5E7EB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: i < idx ? 12 : 14, color: i <= idx ? "#fff" : "#9CA3AF", fontWeight: 700, flexShrink: 0, boxShadow: i === idx ? "0 0 0 3px rgba(220,38,38,0.2)" : "none", transition: "all 0.3s" }}>
+                  {i < idx ? "✓" : icons[i]}
+                </div>
+                <div style={{ fontSize: 9, textAlign: "center", color: i <= idx ? "#DC2626" : "#9CA3AF", fontWeight: i === idx ? 800 : 500, marginTop: 4, lineHeight: 1.2, width: 48 }}>{label}</div>
               </div>
-              <div style={{ fontSize: 9, textAlign: "center", color: i <= idx ? "#DC2626" : "#9CA3AF", fontWeight: i === idx ? 800 : 500, marginTop: 4, lineHeight: 1.2, width: 52 }}>{labels[i]}</div>
+              {i < 5 && <div style={{ height: 2, flex: 1, background: i < idx ? "#DC2626" : "#E5E7EB", margin: "0 2px", marginBottom: 22, flexShrink: 0, transition: "background 0.3s" }} />}
             </div>
-            {i < steps.length - 1 && <div style={{ height: 2, flex: 1, background: i < idx ? "#DC2626" : "#E5E7EB", margin: "0 2px", marginBottom: 20, flexShrink: 0 }} />}
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     );
   };
@@ -678,7 +704,7 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
 // ============================================================
 // RIDER APP
 // ============================================================
-function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onAcceptDelivery, onVerifyOTP, onMarkDelivered, transitLogs, currentRider }) {
+function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onCollectedFromWarehouse, onAcceptDelivery, onVerifyOTP, onMarkDelivered, transitLogs, currentRider }) {
   const rider = currentRider || RIDERS[0];
   const [feed, setFeed] = useState("collection");
   const [otpInput, setOtpInput] = useState({});
@@ -727,10 +753,20 @@ function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onAcceptDel
         {/* Actions */}
         <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
           {pkg.status === "searching_rider" && !isMyCollection && (
-            <Btn onClick={() => onAcceptCollection(pkg.id, rider.id)} variant="primary">Accept Collection</Btn>
+            <Btn onClick={() => onAcceptCollection(pkg.id, rider.id)} variant="primary">📦 Accept Collection Job</Btn>
           )}
           {pkg.status === "searching_rider" && isMyCollection && (
-            <Btn onClick={() => onMarkAtWarehouse(pkg.id, rider.id)} variant="success">✓ Mark: Arrived at Warehouse</Btn>
+            <div style={{ background: "#FEF3C7", border: "1.5px solid #FDE68A", borderRadius: 10, padding: "10px 12px", fontSize: 13, color: "#92400E", fontWeight: 700 }}>
+              ✅ Accepted — go collect & bring to warehouse
+            </div>
+          )}
+          {pkg.status === "picked_up" && isMyCollection && (
+            <Btn onClick={() => onMarkAtWarehouse(pkg.id)} variant="success">🏭 Mark: Arrived at Warehouse</Btn>
+          )}
+          {pkg.status === "pending_warehouse" && isMyCollection && (
+            <div style={{ background: "#EEF2FF", border: "1.5px solid #C7D2FE", borderRadius: 10, padding: "10px 12px", fontSize: 13, color: "#4338CA", fontWeight: 700 }}>
+              ⏳ Waiting for warehouse acceptance...
+            </div>
           )}
           {needsWarehouseOTP && (
             <div style={{ background: "#FEF2F2", border: "1.5px solid #FCA5A5", borderRadius: 10, padding: 12 }}>
@@ -757,8 +793,11 @@ function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onAcceptDel
               {otpError[`${pkg.id}-delivery`] && <div style={{ color: "#EF4444", fontSize: 12, marginTop: 6 }}>❌ Incorrect OTP. Try again.</div>}
             </div>
           )}
+          {pkg.status === "at_warehouse" && isMyDelivery && (
+            <Btn onClick={() => onCollectedFromWarehouse(pkg.id)} variant="primary">🏍️ Collected — Heading to Customer</Btn>
+          )}
           {pkg.status === "out_for_delivery" && isMyDelivery && (!pkg.isHighValue || pkg.otpDeliveryVerified) && (
-            <Btn onClick={() => onMarkDelivered(pkg.id, rider.id)} variant="success">✓ Mark as Delivered</Btn>
+            <Btn onClick={() => onMarkDelivered(pkg.id)} variant="success">🎉 Mark as Delivered</Btn>
           )}
         </div>
       </Card>
@@ -815,7 +854,7 @@ function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onAcceptDel
 // ============================================================
 // ADMIN DASHBOARD
 // ============================================================
-function AdminDashboard({ packages, riders, customers, transitLogs, onDispatch, onAddRider, accounts }) {
+function AdminDashboard({ packages, riders, customers, transitLogs, onDispatch, onAcceptAtWarehouse, onAddRider, accounts }) {
   const [view, setView] = useState("hub");
   const [selectedPkg, setSelectedPkg] = useState(null);
   const [selectedRider, setSelectedRider] = useState("");
@@ -845,6 +884,7 @@ function AdminDashboard({ packages, riders, customers, transitLogs, onDispatch, 
   const [otpInput, setOtpInput] = useState("");
   const [otpError, setOtpError] = useState(false);
 
+  const pendingAcceptance = packages.filter(p => p.status === "pending_warehouse");
   const atHub = packages.filter(p => p.status === "at_warehouse");
   const inTransit = packages.filter(p => ["searching_rider","picked_up","out_for_delivery"].includes(p.status));
   const delivered = packages.filter(p => p.status === "delivered");
@@ -878,9 +918,10 @@ function AdminDashboard({ packages, riders, customers, transitLogs, onDispatch, 
 
       <div style={{ padding: 24 }}>
         {/* Stats Bar */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 16, marginBottom: 24 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 12, marginBottom: 24 }}>
           {[
-            { label: "At Hub", value: atHub.length, sub: "packages", color: "#DC2626" },
+            { label: "Pending Accept", value: pendingAcceptance.length, sub: "need action", color: "#F59E0B" },
+            { label: "At Hub", value: atHub.length, sub: "ready", color: "#6366F1" },
             { label: "In Transit", value: inTransit.length, sub: "packages", color: "#EF4444" },
             { label: "Delivered Today", value: delivered.length, sub: "packages", color: "#10B981" },
             { label: "Customers", value: customers.length, sub: "registered", color: "#7C3AED" },
@@ -894,63 +935,125 @@ function AdminDashboard({ packages, riders, customers, transitLogs, onDispatch, 
 
         {view === "hub" && (
           <div>
-            <div style={{ fontSize: 18, fontWeight: 600, color: "#111827", marginBottom: 16 }}>Hub Inventory — {atHub.length} Packages</div>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", background: "#fff", borderRadius: 16, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-                <thead>
-                  <tr style={{ background: "#F9FAFB" }}>
-                    {["Tracking","Description","Customer","Destination Zone","Value","Fees","Flags","Action"].map(h => (
-                      <th key={h} style={{ padding: "12px 16px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: "1px solid #E5E7EB" }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {atHub.map((pkg, i) => (
-                    <tr key={pkg.id} style={{ borderBottom: i < atHub.length - 1 ? "1px solid #F3F4F6" : "none", background: selectedPkg?.id === pkg.id ? "#FEF2F2" : "#fff" }}>
-                      <td style={{ padding: "12px 16px", fontFamily: "monospace", fontWeight: 600, fontSize: 13, color: "#111827" }}>{pkg.trackingCode}</td>
-                      <td style={{ padding: "12px 16px", fontSize: 13, color: "#374151" }}>{pkg.description}</td>
-                      <td style={{ padding: "12px 16px", fontSize: 13, color: "#374151" }}>{pkg.customerName}</td>
-                      <td style={{ padding: "12px 16px" }}>{(() => { const t = TIER_BADGE[getZoneInfo(pkg.deliveryZone).tier]; return <span style={{ background: t.bg, color: t.color, padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 700 }}>{pkg.deliveryZone}</span>; })()}</td>
-                      <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 700, color: "#111827" }}>KES {pkg.declaredValue.toLocaleString()}</td>
-                      <td style={{ padding: "12px 16px", fontSize: 13, color: "#DC2626", fontWeight: 700 }}>KES {pkg.total}</td>
-                      <td style={{ padding: "12px 16px" }}>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                          {pkg.isHighValue && <HighValueBadge />}
-                          {pkg.isHighValue && !pkg.otpWarehouseVerified && (
-                            <span style={{ fontSize: 10, color: "#DC2626", fontWeight: 700 }}>⚠ OTP PENDING</span>
-                          )}
-                          {pkg.protectionFee > 0 && (
-                            <span style={{ fontSize: 10, background: "#FEF3C7", color: "#7F1D1D", padding: "2px 6px", borderRadius: 10, fontWeight: 700 }}>PROTECTED</span>
-                          )}
-                        </div>
-                      </td>
-                      <td style={{ padding: "12px 16px" }}>
-                        {selectedPkg?.id === pkg.id ? (
-                          <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 180 }}>
-                            <select value={selectedRider} onChange={e => setSelectedRider(e.target.value)} style={{ padding: "6px 10px", border: "1.5px solid #E5E7EB", borderRadius: 8, fontSize: 13, fontFamily: "inherit" }}>
-                              <option value="">Select Rider...</option>
-                              {riders.filter(r => r.zone === pkg.deliveryZone).map(r => (
-                                <option key={r.id} value={r.id}>{r.name}</option>
-                              ))}
-                              {riders.filter(r => r.zone === pkg.deliveryZone).length === 0 &&
-                                riders.map(r => <option key={r.id} value={r.id}>{r.name} ({r.zone})</option>)}
-                            </select>
-                            <div style={{ display: "flex", gap: 6 }}>
-                              <Btn onClick={() => handleDispatch(pkg)} variant="success" size="sm" disabled={!selectedRider}>Dispatch</Btn>
-                              <Btn onClick={() => setSelectedPkg(null)} variant="ghost" size="sm">Cancel</Btn>
-                            </div>
+            {/* ── SECTION 1: Pending Warehouse Acceptance ── */}
+            {pendingAcceptance.length > 0 && (
+              <div style={{ marginBottom: 28 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#F59E0B", boxShadow: "0 0 0 3px rgba(245,158,11,0.2)" }} />
+                  <div style={{ fontSize: 16, fontWeight: 800, color: "#92400E" }}>Awaiting Acceptance — {pendingAcceptance.length} Package{pendingAcceptance.length > 1 ? "s" : ""}</div>
+                  <span style={{ background: "#FEF3C7", color: "#92400E", padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>ACTION REQUIRED</span>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 14 }}>
+                  {pendingAcceptance.map(pkg => {
+                    const collectionRider = riders.find(r => r.id === pkg.riderCollectionId);
+                    return (
+                      <Card key={pkg.id} style={{ border: "2px solid #FDE68A", background: "#FFFBEB" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                          <div>
+                            <div style={{ fontFamily: "monospace", fontWeight: 800, fontSize: 14, color: "#111827" }}>{pkg.trackingCode}</div>
+                            <div style={{ fontSize: 13, color: "#374151", marginTop: 2 }}>{pkg.description}</div>
                           </div>
-                        ) : (
-                          <Btn onClick={() => setSelectedPkg(pkg)} variant="primary" size="sm">Dispatch →</Btn>
-                        )}
-                      </td>
+                          <StatusBadge status={pkg.status} />
+                        </div>
+                        <div style={{ background: "#fff", borderRadius: 10, padding: "10px 12px", marginBottom: 12 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                            <span style={{ color: "#6B7280" }}>Customer</span>
+                            <span style={{ fontWeight: 700, color: "#111827" }}>{pkg.customerName}</span>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                            <span style={{ color: "#6B7280" }}>Brought by</span>
+                            <span style={{ fontWeight: 700, color: "#DC2626" }}>🏍️ {collectionRider?.name || "Unknown Rider"}</span>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                            <span style={{ color: "#6B7280" }}>Destination</span>
+                            <span style={{ fontWeight: 700, color: "#374151" }}>{pkg.deliveryZone}</span>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                            <span style={{ color: "#6B7280" }}>Declared Value</span>
+                            <span style={{ fontWeight: 700, color: "#111827" }}>KES {pkg.declaredValue.toLocaleString()}</span>
+                          </div>
+                        </div>
+                        {pkg.isHighValue && <div style={{ marginBottom: 10 }}><HighValueBadge /></div>}
+                        <Btn onClick={() => onAcceptAtWarehouse(pkg.id)} variant="success" style={{ width: "100%" }}>
+                          ✅ Accept Package at Warehouse
+                        </Btn>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ── SECTION 2: Hub Inventory — Ready to Dispatch ── */}
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#6366F1" }} />
+                <div style={{ fontSize: 16, fontWeight: 800, color: "#111827" }}>Hub Inventory — {atHub.length} Package{atHub.length !== 1 ? "s" : ""} Ready</div>
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", background: "#fff", borderRadius: 16, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+                  <thead>
+                    <tr style={{ background: "#F9FAFB" }}>
+                      {["Tracking","Description","Customer","Zone","Value","Fees","Flags","Assign Rider"].map(h => (
+                        <th key={h} style={{ padding: "12px 16px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: "1px solid #E5E7EB" }}>{h}</th>
+                      ))}
                     </tr>
-                  ))}
-                  {atHub.length === 0 && (
-                    <tr><td colSpan={8} style={{ padding: 32, textAlign: "center", color: "#9CA3AF" }}>No packages at hub right now</td></tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {atHub.map((pkg, i) => (
+                      <tr key={pkg.id} style={{ borderBottom: i < atHub.length - 1 ? "1px solid #F3F4F6" : "none", background: selectedPkg?.id === pkg.id ? "#FEF2F2" : "#fff" }}>
+                        <td style={{ padding: "12px 16px", fontFamily: "monospace", fontWeight: 700, fontSize: 13, color: "#111827" }}>{pkg.trackingCode}</td>
+                        <td style={{ padding: "12px 16px", fontSize: 13, color: "#374151" }}>{pkg.description}</td>
+                        <td style={{ padding: "12px 16px", fontSize: 13, color: "#374151" }}>{pkg.customerName}</td>
+                        <td style={{ padding: "12px 16px" }}>{(() => { const t = TIER_BADGE[getZoneInfo(pkg.deliveryZone).tier]; return <span style={{ background: t.bg, color: t.color, padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 700 }}>{pkg.deliveryZone}</span>; })()}</td>
+                        <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 700, color: "#111827" }}>KES {pkg.declaredValue.toLocaleString()}</td>
+                        <td style={{ padding: "12px 16px", fontSize: 13, color: "#DC2626", fontWeight: 700 }}>KES {pkg.total}</td>
+                        <td style={{ padding: "12px 16px" }}>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                            {pkg.isHighValue && <HighValueBadge />}
+                            {pkg.isHighValue && !pkg.otpWarehouseVerified && (
+                              <span style={{ fontSize: 10, color: "#DC2626", fontWeight: 700 }}>⚠ OTP PENDING</span>
+                            )}
+                            {pkg.protectionFee > 0 && (
+                              <span style={{ fontSize: 10, background: "#FEF3C7", color: "#7F1D1D", padding: "2px 6px", borderRadius: 10, fontWeight: 700 }}>PROTECTED</span>
+                            )}
+                          </div>
+                        </td>
+                        <td style={{ padding: "12px 16px" }}>
+                          {pkg.riderDeliveryId ? (
+                            <div>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: "#10B981" }}>
+                                🏍️ {riders.find(r => r.id === pkg.riderDeliveryId)?.name || "Assigned"}
+                              </div>
+                              <StatusBadge status={pkg.status} />
+                            </div>
+                          ) : selectedPkg?.id === pkg.id ? (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 180 }}>
+                              <select value={selectedRider} onChange={e => setSelectedRider(e.target.value)} style={{ padding: "6px 10px", border: "1.5px solid #E5E7EB", borderRadius: 8, fontSize: 13, fontFamily: "inherit" }}>
+                                <option value="">Select Rider...</option>
+                                {riders.filter(r => r.zone === pkg.deliveryZone).map(r => (
+                                  <option key={r.id} value={r.id}>{r.name}</option>
+                                ))}
+                                {riders.filter(r => r.zone === pkg.deliveryZone).length === 0 &&
+                                  riders.map(r => <option key={r.id} value={r.id}>{r.name} ({r.zone})</option>)}
+                              </select>
+                              <div style={{ display: "flex", gap: 6 }}>
+                                <Btn onClick={() => handleDispatch(pkg)} variant="success" size="sm" disabled={!selectedRider}>🚀 Dispatch</Btn>
+                                <Btn onClick={() => setSelectedPkg(null)} variant="ghost" size="sm">Cancel</Btn>
+                              </div>
+                            </div>
+                          ) : (
+                            <Btn onClick={() => setSelectedPkg(pkg)} variant="primary" size="sm">Assign Rider →</Btn>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {atHub.length === 0 && (
+                      <tr><td colSpan={8} style={{ padding: 32, textAlign: "center", color: "#9CA3AF" }}>No packages at hub ready to dispatch</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
@@ -1742,8 +1845,22 @@ export default function App() {
   };
 
   const onMarkAtWarehouse = async (pkgId) => {
+    await updatePkg(pkgId, { status: "pending_warehouse" });
+    await addLog(pkgId, user.id, "rider", user.name, "ARRIVED_AT_WAREHOUSE", "Baruk Central, CBD", "Awaiting warehouse acceptance");
+  };
+
+  // ── Admin accepts package from rider at warehouse ──
+  const onAcceptAtWarehouse = async (pkgId) => {
+    const pkg = packages.find(p => p.id === pkgId);
     await updatePkg(pkgId, { status: "at_warehouse" });
-    await addLog(pkgId, user.id, "rider", user.name, "ARRIVED_AT_WAREHOUSE", "Baruk Central, CBD");
+    await addLog(pkgId, user.id, "admin", user.name, "WAREHOUSE_ACCEPTED", "Baruk Central, CBD", "Package received and logged at hub");
+  };
+
+  // ── Rider confirms they collected from warehouse before delivery ──
+  const onCollectedFromWarehouse = async (pkgId) => {
+    const pkg = packages.find(p => p.id === pkgId);
+    await updatePkg(pkgId, { status: "out_for_delivery" });
+    await addLog(pkgId, user.id, "rider", user.name, "COLLECTED_FROM_WAREHOUSE", "Baruk Central, CBD", "Package collected, heading to customer");
   };
 
   const onDispatch = async (pkgId, riderId) => {
@@ -1828,8 +1945,8 @@ export default function App() {
     <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", background: "#F1F5F9", minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
       <TopBar />
       {user.role === "customer" && <CustomerApp packages={packages.filter(p => p.customerId === user.id)} onCreatePackage={onCreatePackage} transitLogs={logs} />}
-      {user.role === "rider"    && <RiderApp packages={packages} onAcceptCollection={onAcceptCollection} onMarkAtWarehouse={onMarkAtWarehouse} onAcceptDelivery={onAcceptDelivery} onVerifyOTP={onVerifyOTP} onMarkDelivered={onMarkDelivered} transitLogs={logs} currentRider={user} />}
-      {user.role === "admin"    && <AdminDashboard packages={packages} riders={riders} customers={customers} transitLogs={logs} onDispatch={onDispatch} onAddRider={onAddRider} accounts={[...riders, user]} />}
+      {user.role === "rider"    && <RiderApp packages={packages} onAcceptCollection={onAcceptCollection} onMarkAtWarehouse={onMarkAtWarehouse} onCollectedFromWarehouse={onCollectedFromWarehouse} onAcceptDelivery={onAcceptDelivery} onVerifyOTP={onVerifyOTP} onMarkDelivered={onMarkDelivered} transitLogs={logs} currentRider={user} />}
+      {user.role === "admin"    && <AdminDashboard packages={packages} riders={riders} customers={customers} transitLogs={logs} onDispatch={onDispatch} onAcceptAtWarehouse={onAcceptAtWarehouse} onAddRider={onAddRider} accounts={[...riders, user]} />}
       <InstallBanner />
     </div>
   );
