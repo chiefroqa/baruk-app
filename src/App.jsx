@@ -815,7 +815,7 @@ function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onAcceptDel
 // ============================================================
 // ADMIN DASHBOARD
 // ============================================================
-function AdminDashboard({ packages, riders, transitLogs, onDispatch, onAddRider, accounts }) {
+function AdminDashboard({ packages, riders, customers, transitLogs, onDispatch, onAddRider, accounts }) {
   const [view, setView] = useState("hub");
   const [selectedPkg, setSelectedPkg] = useState(null);
   const [selectedRider, setSelectedRider] = useState("");
@@ -870,7 +870,7 @@ function AdminDashboard({ packages, riders, transitLogs, onDispatch, onAddRider,
           </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          {[["hub","📦 Hub Inventory"],["riders","🏍️ Riders"],["logs","📋 Custody Logs"],["revenue","💰 Revenue"]].map(([v, l]) => (
+          {[["hub","📦 Hub Inventory"],["riders","🏍️ Riders"],["customers","👥 Customers"],["logs","📋 Custody Logs"],["revenue","💰 Revenue"]].map(([v, l]) => (
             <button key={v} onClick={() => setView(v)} style={{ padding: "6px 14px", border: "none", background: view === v ? "#DC2626" : "#F3F4F6", color: view === v ? "#fff" : "#6B7280", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "inherit" }}>{l}</button>
           ))}
         </div>
@@ -878,11 +878,12 @@ function AdminDashboard({ packages, riders, transitLogs, onDispatch, onAddRider,
 
       <div style={{ padding: 24 }}>
         {/* Stats Bar */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 16, marginBottom: 24 }}>
           {[
             { label: "At Hub", value: atHub.length, sub: "packages", color: "#DC2626" },
             { label: "In Transit", value: inTransit.length, sub: "packages", color: "#EF4444" },
             { label: "Delivered Today", value: delivered.length, sub: "packages", color: "#10B981" },
+            { label: "Customers", value: customers.length, sub: "registered", color: "#7C3AED" },
             { label: "Revenue", value: `KES ${totalFees.toLocaleString()}`, sub: "collected", color: "#DC2626" },
           ].map(s => (
             <Card key={s.label} style={{ textAlign: "center" }}>
@@ -1048,6 +1049,103 @@ function AdminDashboard({ packages, riders, transitLogs, onDispatch, onAddRider,
             </div>
           </div>
         )}
+        {view === "customers" && (
+          <div>
+            {/* Header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: "#111827" }}>Customer Profiles</div>
+                <div style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>{customers.length} registered customers</div>
+              </div>
+            </div>
+
+            {customers.length === 0 ? (
+              <Card style={{ textAlign: "center", padding: 48 }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>👥</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#111827", marginBottom: 6 }}>No customers yet</div>
+                <div style={{ fontSize: 13, color: "#9CA3AF" }}>Customer accounts will appear here once they sign up.</div>
+              </Card>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
+                {customers.map(customer => {
+                  const custPkgs = packages.filter(p => p.customerId === customer.id);
+                  const activePkgs = custPkgs.filter(p => !["delivered","cancelled"].includes(p.status));
+                  const deliveredPkgs = custPkgs.filter(p => p.status === "delivered");
+                  const totalSpend = custPkgs.reduce((s, p) => s + p.total, 0);
+                  const joinDate = customer.createdAt ? new Date(customer.createdAt).toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric" }) : "—";
+                  return (
+                    <Card key={customer.id} style={{ border: "1px solid #F3F4F6", transition: "box-shadow 0.15s" }}
+                      onMouseEnter={e => e.currentTarget.style.boxShadow = "0 4px 20px rgba(220,38,38,0.1)"}
+                      onMouseLeave={e => e.currentTarget.style.boxShadow = "0 1px 4px rgba(0,0,0,0.07)"}>
+                      {/* Profile Header */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
+                        <div style={{ width: 52, height: 52, borderRadius: "50%", background: "linear-gradient(135deg, #DC2626, #EF4444)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0, boxShadow: "0 4px 12px rgba(220,38,38,0.25)" }}>
+                          {customer.name ? customer.name.charAt(0).toUpperCase() : "?"}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 16, fontWeight: 800, color: "#111827", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{customer.name || "Unknown"}</div>
+                          <div style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>Customer since {joinDate}</div>
+                        </div>
+                        <span style={{ background: "#F0FDF4", color: "#16A34A", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", flexShrink: 0 }}>Active</span>
+                      </div>
+
+                      {/* Contact Details */}
+                      <div style={{ background: "#F9FAFB", borderRadius: 12, padding: "12px 14px", marginBottom: 14 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Contact Details</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                          <span style={{ fontSize: 14 }}>📞</span>
+                          <a href={"tel:" + customer.phone} style={{ fontSize: 14, fontWeight: 700, color: "#111827", textDecoration: "none" }}>{customer.phone || "—"}</a>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 14 }}>✉️</span>
+                          <span style={{ fontSize: 13, color: "#374151", wordBreak: "break-all" }}>{customer.email || "—"}</span>
+                        </div>
+                      </div>
+
+                      {/* Delivery Stats */}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
+                        <div style={{ textAlign: "center", background: "#FEF2F2", borderRadius: 10, padding: "10px 4px" }}>
+                          <div style={{ fontSize: 20, fontWeight: 900, color: "#DC2626" }}>{custPkgs.length}</div>
+                          <div style={{ fontSize: 10, color: "#6B7280", fontWeight: 700, textTransform: "uppercase" }}>Total</div>
+                        </div>
+                        <div style={{ textAlign: "center", background: "#FEF3C7", borderRadius: 10, padding: "10px 4px" }}>
+                          <div style={{ fontSize: 20, fontWeight: 900, color: "#D97706" }}>{activePkgs.length}</div>
+                          <div style={{ fontSize: 10, color: "#6B7280", fontWeight: 700, textTransform: "uppercase" }}>Active</div>
+                        </div>
+                        <div style={{ textAlign: "center", background: "#ECFDF5", borderRadius: 10, padding: "10px 4px" }}>
+                          <div style={{ fontSize: 20, fontWeight: 900, color: "#10B981" }}>{deliveredPkgs.length}</div>
+                          <div style={{ fontSize: 10, color: "#6B7280", fontWeight: 700, textTransform: "uppercase" }}>Done</div>
+                        </div>
+                      </div>
+
+                      {/* Spend */}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 12, borderTop: "1px solid #F3F4F6" }}>
+                        <span style={{ fontSize: 12, color: "#6B7280", fontWeight: 600 }}>Total Spend</span>
+                        <span style={{ fontSize: 16, fontWeight: 900, color: "#DC2626" }}>KES {totalSpend.toLocaleString()}</span>
+                      </div>
+
+                      {/* Recent package */}
+                      {custPkgs.length > 0 && (() => {
+                        const latest = custPkgs[0];
+                        return (
+                          <div style={{ marginTop: 12, padding: "10px 12px", background: "#F9FAFB", borderRadius: 10, border: "1px solid #F3F4F6" }}>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Latest Order</div>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <span style={{ fontFamily: "monospace", fontSize: 12, fontWeight: 700, color: "#DC2626" }}>{latest.trackingCode}</span>
+                              <StatusBadge status={latest.status} />
+                            </div>
+                            <div style={{ fontSize: 12, color: "#6B7280", marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{latest.description} → {latest.deliveryZone}</div>
+                          </div>
+                        );
+                      })()}
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {view === "logs" && (
           <div>
             <div style={{ fontSize: 18, fontWeight: 600, color: "#111827", marginBottom: 16 }}>Chain of Custody Log</div>
@@ -1542,6 +1640,12 @@ export default function App() {
     if (data) setRiders(data.map(p => ({ id: p.id, name: p.name, phone: p.phone, zone: p.home_zone, licenseNumber: p.license_number, role: "rider" })));
   }, []);
 
+  const [customers, setCustomers] = useState([]);
+  const loadCustomers = useCallback(async () => {
+    const { data } = await supabase.from("profiles").select("*").eq("role", "customer");
+    if (data) setCustomers(data.map(p => ({ id: p.id, name: p.name, phone: p.phone, email: p.email, role: "customer", createdAt: p.created_at })));
+  }, []);
+
   // ── Auth state listener ──
   useEffect(() => {
     // Check existing session on load
@@ -1564,6 +1668,7 @@ export default function App() {
     loadPackages();
     loadLogs();
     loadRiders();
+    loadCustomers();
 
     // Realtime subscriptions
     const channel = supabase.channel("baruk-realtime")
@@ -1724,7 +1829,7 @@ export default function App() {
       <TopBar />
       {user.role === "customer" && <CustomerApp packages={packages.filter(p => p.customerId === user.id)} onCreatePackage={onCreatePackage} transitLogs={logs} />}
       {user.role === "rider"    && <RiderApp packages={packages} onAcceptCollection={onAcceptCollection} onMarkAtWarehouse={onMarkAtWarehouse} onAcceptDelivery={onAcceptDelivery} onVerifyOTP={onVerifyOTP} onMarkDelivered={onMarkDelivered} transitLogs={logs} currentRider={user} />}
-      {user.role === "admin"    && <AdminDashboard packages={packages} riders={riders} transitLogs={logs} onDispatch={onDispatch} onAddRider={onAddRider} accounts={[...riders, user]} />}
+      {user.role === "admin"    && <AdminDashboard packages={packages} riders={riders} customers={customers} transitLogs={logs} onDispatch={onDispatch} onAddRider={onAddRider} accounts={[...riders, user]} />}
       <InstallBanner />
     </div>
   );
