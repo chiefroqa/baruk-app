@@ -377,7 +377,7 @@ const MPESA_NAME    = "Coral Crafts";
 // ============================================================
 // CUSTOMER APP
 // ============================================================
-function CustomerApp({ packages, onCreatePackage, transitLogs }) {
+function CustomerApp({ packages, onCreatePackage, transitLogs, riders = [] }) {
   const [view, setView]             = useState("track");
   const [form, setForm]             = useState({ pickupAddress: "", deliveryAddress: "", deliveryZone: ZONES[0], description: "", size: "small", declaredValue: "" });
   const [expandedPkg, setExpandedPkg] = useState(null);
@@ -691,6 +691,38 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
                 {expandedPkg === pkg.id && (
                   <div style={{ marginTop: 14, borderTop: "1px solid #F3F4F6", paddingTop: 14 }}>
                     <TrackingProgress status={pkg.status} />
+                    {(() => {
+                      const collRider = pkg.riderCollectionId ? riders.find(r => r.id === pkg.riderCollectionId) : null;
+                      const delRider  = pkg.riderDeliveryId   ? riders.find(r => r.id === pkg.riderDeliveryId)   : null;
+                      if (!collRider && !delRider) return null;
+                      return (
+                        <div style={{ marginBottom: 14 }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Your Rider</div>
+                          {collRider && (
+                            <div style={{ background: "#F9FAFB", border: "1px solid #E5E7EB", borderRadius: 10, padding: "10px 12px", marginBottom: 6 }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <div>
+                                  <div style={{ fontSize: 13, fontWeight: 800, color: "#111827" }}>🏍️ {collRider.name}</div>
+                                  <div style={{ fontSize: 11, color: "#6B7280", marginTop: 1 }}>Collection rider · {collRider.phone}</div>
+                                </div>
+                                <a href={`tel:${collRider.phone}`} style={{ background: "#DC2626", color: "#fff", padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700, textDecoration: "none" }}>📞 Call</a>
+                              </div>
+                            </div>
+                          )}
+                          {delRider && delRider.id !== collRider?.id && (
+                            <div style={{ background: "#F9FAFB", border: "1px solid #E5E7EB", borderRadius: 10, padding: "10px 12px" }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <div>
+                                  <div style={{ fontSize: 13, fontWeight: 800, color: "#111827" }}>🏍️ {delRider.name}</div>
+                                  <div style={{ fontSize: 11, color: "#6B7280", marginTop: 1 }}>Delivery rider · {delRider.phone}</div>
+                                </div>
+                                <a href={`tel:${delRider.phone}`} style={{ background: "#10B981", color: "#fff", padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700, textDecoration: "none" }}>📞 Call</a>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                     <div style={{ fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 10 }}>Chain of Custody</div>
                     <Timeline logs={transitLogs.filter(l => l.packageId === pkg.id)} />
                   </div>
@@ -707,7 +739,7 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
 // ============================================================
 // RIDER APP
 // ============================================================
-function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onCollectedFromWarehouse, onAcceptDelivery, onVerifyOTP, onMarkDelivered, transitLogs, currentRider }) {
+function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onCollectedFromWarehouse, onAcceptDelivery, onVerifyOTP, onMarkDelivered, transitLogs, currentRider, customers = [] }) {
   const rider = currentRider || RIDERS[0];
   const [feed, setFeed] = useState("collection");
   const [otpInput, setOtpInput] = useState({});
@@ -720,7 +752,8 @@ function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onCollected
   // Every package this rider is involved in (collection or delivery), any status
   const myActive = packages.filter(p => p.riderCollectionId === rider.id || p.riderDeliveryId === rider.id);
   const myCompleted = myActive.filter(p => p.status === "delivered");
-  const myInProgress = myActive.filter(p => p.status !== "delivered");
+  // Active tab: exclude delivered AND exclude unaccepted delivery jobs (those show in deliveryFeed)
+  const myInProgress = myActive.filter(p => p.status !== "delivered" && !(p.riderDeliveryId === rider.id && p.status === "at_warehouse"));
 
   const handleOTPVerify = (pkg, type) => {
     const entered = otpInput[`${pkg.id}-${type}`] || "";
@@ -764,6 +797,23 @@ function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onCollected
           <span>Zone: <strong style={{ color: "#374151" }}>{pkg.deliveryZone}</strong></span>
           <span>KES {pkg.declaredValue.toLocaleString()} value</span>
         </div>
+
+        {/* ── Sender contact — shown to collection rider once job accepted ── */}
+        {isMyCollection && pkg.status !== "searching_rider" && (() => {
+          const sender = customers.find(c => c.id === pkg.customerId);
+          return sender ? (
+            <div style={{ marginTop: 10, background: "#EFF6FF", border: "1.5px solid #BFDBFE", borderRadius: 10, padding: "10px 12px" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#1D4ED8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>📬 Sender Contact</div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: "#111827" }}>{sender.name}</div>
+                  <div style={{ fontSize: 12, color: "#6B7280", marginTop: 1 }}>{sender.phone}</div>
+                </div>
+                <a href={`tel:${sender.phone}`} style={{ background: "#2563EB", color: "#fff", padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700, textDecoration: "none", flexShrink: 0 }}>📞 Call</a>
+              </div>
+            </div>
+          ) : null;
+        })()}
 
         {/* Actions — driven by exact status + rider role */}
         <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
@@ -809,7 +859,9 @@ function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onCollected
 
           {/* ── DELIVERY SIDE ── */}
           {pkg.status === "at_warehouse" && isMyDelivery && (
-            <Btn onClick={() => doAction(() => onCollectedFromWarehouse(pkg.id))} variant="primary" disabled={busy}>{busy ? "Saving…" : "🏍️ Collected from Hub — Out for Delivery"}</Btn>
+            <Btn onClick={() => doAction(() => onAcceptDelivery(pkg.id))} variant="primary" disabled={busy}>
+              {busy ? "Accepting…" : "✅ Accept Delivery Job"}
+            </Btn>
           )}
           {pkg.status === "out_for_delivery" && isMyDelivery && (
             needsDeliveryOTP ? (
@@ -2310,6 +2362,11 @@ export default function App() {
     await addLog(pkgId, user.id, "admin", user.name, "DISPATCHED_TO_RIDER", "Baruk Central, CBD", `Assigned to ${rider?.name || riderId} — awaiting collection from hub`);
   };
 
+  const onAcceptDelivery = async (pkgId) => {
+    await updatePkg(pkgId, { status: "out_for_delivery" });
+    await addLog(pkgId, user.id, "rider", user.name, "ACCEPTED_DELIVERY_JOB", "Baruk Central, CBD", "Rider accepted delivery job — heading out");
+  };
+
   const onVerifyOTP = async (pkgId, type) => {
     const pkg = packages.find(p => p.id === pkgId);
     if (type === "warehouse") {
@@ -2386,8 +2443,8 @@ export default function App() {
   return (
     <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", background: "#F1F5F9", minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
       <TopBar />
-      {user.role === "customer" && <CustomerApp packages={packages.filter(p => p.customerId === user.id)} onCreatePackage={onCreatePackage} transitLogs={logs} />}
-      {user.role === "rider"    && <RiderApp packages={packages} onAcceptCollection={onAcceptCollection} onMarkAtWarehouse={onMarkAtWarehouse} onCollectedFromWarehouse={onCollectedFromWarehouse} onAcceptDelivery={onAcceptDelivery} onVerifyOTP={onVerifyOTP} onMarkDelivered={onMarkDelivered} transitLogs={logs} currentRider={user} />}
+      {user.role === "customer" && <CustomerApp packages={packages.filter(p => p.customerId === user.id)} onCreatePackage={onCreatePackage} transitLogs={logs} riders={riders} />}
+      {user.role === "rider"    && <RiderApp packages={packages} onAcceptCollection={onAcceptCollection} onMarkAtWarehouse={onMarkAtWarehouse} onCollectedFromWarehouse={onCollectedFromWarehouse} onAcceptDelivery={onAcceptDelivery} onVerifyOTP={onVerifyOTP} onMarkDelivered={onMarkDelivered} transitLogs={logs} currentRider={user} customers={customers} />}
       {user.role === "admin"    && <AdminDashboard packages={packages} riders={riders} customers={customers} transitLogs={logs} onDispatch={onDispatch} onAcceptAtWarehouse={onAcceptAtWarehouse} onConfirmDelivery={onConfirmDelivery} onAddRider={onAddRider} accounts={[...riders, user]} onRefresh={loadPackages} />}
       <InstallBanner />
     </div>
