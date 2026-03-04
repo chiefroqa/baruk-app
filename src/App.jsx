@@ -940,8 +940,10 @@ const ConfirmDeliveryBtn = ({ pkgId, onConfirmDelivery }) => {
 // ============================================================
 // ADMIN DASHBOARD
 // ============================================================
-function AdminDashboard({ packages, riders, customers, transitLogs, onDispatch, onAcceptAtWarehouse, onConfirmDelivery, onAddRider, accounts }) {
+function AdminDashboard({ packages, riders, customers, transitLogs, onDispatch, onAcceptAtWarehouse, onConfirmDelivery, onAddRider, accounts, onRefresh }) {
   const [view, setView] = useState("hub");
+  // Refresh on mount so admin always sees latest DB state
+  useEffect(() => { if (onRefresh) onRefresh(); }, []);
   const [selectedPkg, setSelectedPkg] = useState(null);
   const [selectedRider, setSelectedRider] = useState("");
   const [showAddRider, setShowAddRider] = useState(false);
@@ -976,7 +978,7 @@ function AdminDashboard({ packages, riders, customers, transitLogs, onDispatch, 
   const atHub = packages.filter(p => p.status === "at_warehouse");
   const pendingDelivery = packages.filter(p => p.status === "pending_delivery");
   const newRequests = packages.filter(p => p.status === "searching_rider");
-  const inTransit = packages.filter(p => ["searching_rider","picked_up","pending_warehouse","out_for_delivery","pending_delivery"].includes(p.status));
+  const inTransit = packages.filter(p => ["searching_rider","picked_up","pending_warehouse","at_warehouse","out_for_delivery","pending_delivery"].includes(p.status));
   const delivered = packages.filter(p => p.status === "delivered");
   const totalFees = packages.reduce((s, p) => s + p.total, 0);
   const totalValue = inTransit.reduce((s, p) => s + p.declaredValue, 0);
@@ -1013,6 +1015,7 @@ function AdminDashboard({ packages, riders, customers, transitLogs, onDispatch, 
             ["customers", "👥 Customers", 0],
             ["logs",      "📋 Custody", 0],
             ["revenue",   "💰 Revenue", 0],
+            ["debug",     "🔧 Debug", 0],
           ].map(([v, l, badge]) => (
             <button key={v} onClick={() => setView(v)} style={{ padding: "6px 14px", border: "none", background: view === v ? "#DC2626" : "#F3F4F6", color: view === v ? "#fff" : "#6B7280", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "inherit", position: "relative" }}>
               {l}
@@ -1631,6 +1634,66 @@ function AdminDashboard({ packages, riders, customers, transitLogs, onDispatch, 
           </div>
         )}
 
+        {view === "debug" && (
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 900, color: "#111827", marginBottom: 4 }}>🔧 Debug Panel</div>
+            <div style={{ fontSize: 13, color: "#6B7280", marginBottom: 16 }}>Live package statuses as received from Supabase. Use this to verify what the DB actually contains.</div>
+            <Card style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, fontFamily: "monospace" }}>
+                <thead>
+                  <tr style={{ background: "#F9FAFB" }}>
+                    {["Tracking Code","Status (raw)","riderCollectionId","riderDeliveryId","Filters match"].map(h => (
+                      <th key={h} style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: "#6B7280", borderBottom: "1px solid #E5E7EB", fontSize: 11, textTransform: "uppercase" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {packages.map(pkg => {
+                    const isPendingAccept = pkg.status === "pending_warehouse";
+                    const isAtHub = pkg.status === "at_warehouse";
+                    const isPendingDelivery = pkg.status === "pending_delivery";
+                    const isInTransit = ["searching_rider","picked_up","pending_warehouse","out_for_delivery","pending_delivery"].includes(pkg.status);
+                    const matchLabels = [
+                      isPendingAccept && "PENDING ACCEPT",
+                      isAtHub && (pkg.riderDeliveryId ? "AT HUB (dispatched)" : "AT HUB (unassigned)"),
+                      isPendingDelivery && "PENDING DELIVERY",
+                      isInTransit && "IN TRANSIT",
+                    ].filter(Boolean).join(", ") || "—";
+                    return (
+                      <tr key={pkg.id} style={{ borderBottom: "1px solid #F3F4F6", background: (isPendingAccept || isPendingDelivery) ? "#FFF9C4" : "#fff" }}>
+                        <td style={{ padding: "8px 12px", fontWeight: 700, color: "#DC2626" }}>{pkg.trackingCode}</td>
+                        <td style={{ padding: "8px 12px" }}>
+                          <span style={{ background: "#F3F4F6", padding: "2px 8px", borderRadius: 6, fontWeight: 700 }}>{pkg.status}</span>
+                        </td>
+                        <td style={{ padding: "8px 12px", color: pkg.riderCollectionId ? "#059669" : "#9CA3AF" }}>
+                          {pkg.riderCollectionId ? pkg.riderCollectionId.slice(0,8)+"…" : "null"}
+                        </td>
+                        <td style={{ padding: "8px 12px", color: pkg.riderDeliveryId ? "#059669" : "#9CA3AF" }}>
+                          {pkg.riderDeliveryId ? pkg.riderDeliveryId.slice(0,8)+"…" : "null"}
+                        </td>
+                        <td style={{ padding: "8px 12px", color: "#374151", fontWeight: 600 }}>{matchLabels}</td>
+                      </tr>
+                    );
+                  })}
+                  {packages.length === 0 && (
+                    <tr><td colSpan={5} style={{ padding: 24, textAlign: "center", color: "#9CA3AF" }}>No packages loaded</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </Card>
+            <Card style={{ marginTop: 16, background: "#1F2937", color: "#D1D5DB", fontFamily: "monospace", fontSize: 12 }}>
+              <div style={{ fontWeight: 700, color: "#F9FAFB", marginBottom: 8 }}>Summary counts</div>
+              <div>pendingAcceptance (status="pending_warehouse"): <strong style={{ color: "#FCD34D" }}>{pendingAcceptance.length}</strong></div>
+              <div>atHub (status="at_warehouse"): <strong style={{ color: "#FCD34D" }}>{atHub.length}</strong> (unassigned: {atHubUnassigned.length}, dispatched: {atHubDispatched.length})</div>
+              <div>pendingDelivery (status="pending_delivery"): <strong style={{ color: "#FCD34D" }}>{pendingDelivery.length}</strong></div>
+              <div>inTransit: <strong style={{ color: "#FCD34D" }}>{inTransit.length}</strong></div>
+              <div>delivered: <strong style={{ color: "#FCD34D" }}>{delivered.length}</strong></div>
+              <div>total packages loaded: <strong style={{ color: "#FCD34D" }}>{packages.length}</strong></div>
+              <div style={{ marginTop: 8, color: "#9CA3AF" }}>Open browser DevTools → Console to see raw DB payloads on every update</div>
+            </Card>
+          </div>
+        )}
+
         {view === "revenue" && (
           <div>
             <div style={{ fontSize: 18, fontWeight: 600, color: "#111827", marginBottom: 16 }}>Revenue & Liability Overview</div>
@@ -2077,8 +2140,12 @@ export default function App() {
 
   // ── Fetch initial data ──
   const loadPackages = useCallback(async () => {
-    const { data } = await supabase.from("packages").select("*").order("created_at", { ascending: false });
-    if (data) setPackages(data.map(dbPkgToApp));
+    const { data, error } = await supabase.from("packages").select("*").order("created_at", { ascending: false });
+    if (error) { console.error("[loadPackages] error:", error); return; }
+    if (data) {
+      console.log("[loadPackages] raw statuses:", data.map(p => ({ id: p.id, status: p.status, ridCol: p.rider_collection_id, ridDel: p.rider_delivery_id })));
+      setPackages(data.map(dbPkgToApp));
+    }
   }, []);
 
   const loadLogs = useCallback(async () => {
@@ -2171,16 +2238,17 @@ export default function App() {
     if (updates.otpWarehouseVerified !== undefined) dbUpdates.otp_warehouse_verified     = updates.otpWarehouseVerified;
     if (updates.otpDeliveryVerified  !== undefined) dbUpdates.otp_delivery_verified      = updates.otpDeliveryVerified;
 
-    const { error } = await supabase.from("packages").update(dbUpdates).eq("id", id);
+    console.log("[updatePkg] writing to DB:", { id, dbUpdates });
+    const { data: updatedRow, error } = await supabase.from("packages").update(dbUpdates).eq("id", id).select().single();
     if (error) {
-      // Roll back optimistic update and alert
-      console.error("updatePkg failed:", error);
+      console.error("[updatePkg] FAILED:", error);
       await loadPackages(); // re-sync from DB
-      alert(`Error saving update: ${error.message}
-
-Check Supabase RLS policies — the rider/admin may not have UPDATE permission on the packages table.`);
+      alert(`DB update failed: ${error.message}\n\nPayload: ${JSON.stringify(dbUpdates)}\n\nCheck browser console for details.`);
+    } else {
+      console.log("[updatePkg] success, DB now has:", { id: updatedRow?.id, status: updatedRow?.status });
+      // Force a fresh load to be sure local state matches DB
+      await loadPackages();
     }
-    // Realtime will also trigger loadPackages() on success
   };
 
   // ── Create new package ──
@@ -2320,7 +2388,7 @@ Check Supabase RLS policies — the rider/admin may not have UPDATE permission o
       <TopBar />
       {user.role === "customer" && <CustomerApp packages={packages.filter(p => p.customerId === user.id)} onCreatePackage={onCreatePackage} transitLogs={logs} />}
       {user.role === "rider"    && <RiderApp packages={packages} onAcceptCollection={onAcceptCollection} onMarkAtWarehouse={onMarkAtWarehouse} onCollectedFromWarehouse={onCollectedFromWarehouse} onAcceptDelivery={onAcceptDelivery} onVerifyOTP={onVerifyOTP} onMarkDelivered={onMarkDelivered} transitLogs={logs} currentRider={user} />}
-      {user.role === "admin"    && <AdminDashboard packages={packages} riders={riders} customers={customers} transitLogs={logs} onDispatch={onDispatch} onAcceptAtWarehouse={onAcceptAtWarehouse} onConfirmDelivery={onConfirmDelivery} onAddRider={onAddRider} accounts={[...riders, user]} />}
+      {user.role === "admin"    && <AdminDashboard packages={packages} riders={riders} customers={customers} transitLogs={logs} onDispatch={onDispatch} onAcceptAtWarehouse={onAcceptAtWarehouse} onConfirmDelivery={onConfirmDelivery} onAddRider={onAddRider} accounts={[...riders, user]} onRefresh={loadPackages} />}
       <InstallBanner />
     </div>
   );
