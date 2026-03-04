@@ -255,6 +255,7 @@ const StatusBadge = ({ status }) => {
     pending_warehouse:        { label: "Pending Acceptance",   color: "#8B5CF6", bg: "#EDE9FE" },
     at_warehouse:             { label: "At Warehouse",         color: "#6366F1", bg: "#EEF2FF" },
     out_for_delivery:         { label: "Out for Delivery",     color: "#10B981", bg: "#D1FAE5" },
+    pending_delivery:         { label: "Pending Confirmation",  color: "#F97316", bg: "#FFF7ED" },
     collected_by_rider:       { label: "Collected by Rider",   color: "#0EA5E9", bg: "#E0F2FE" },
     delivered:                { label: "Delivered ✓",          color: "#059669", bg: "#ECFDF5" },
     cancelled:                { label: "Cancelled",            color: "#EF4444", bg: "#FEE2E2" },
@@ -333,6 +334,8 @@ const EVENT_META = {
   DISPATCHED_TO_RIDER:       { icon: "🚀", color: "#DC2626", label: "Dispatched to Rider" },
   COLLECTED_FROM_WAREHOUSE:  { icon: "🏍️", color: "#0EA5E9", label: "Collected from Warehouse" },
   OUT_FOR_DELIVERY:          { icon: "🏍️", color: "#0EA5E9", label: "Out for Delivery" },
+  DELIVERY_REPORTED:         { icon: "📬", color: "#F97316", label: "Delivery Reported by Rider" },
+  DELIVERY_CONFIRMED:        { icon: "🎉", color: "#059669", label: "Delivery Confirmed" },
   DELIVERED:                 { icon: "🎉", color: "#059669", label: "Delivered!" },
   OTP_WAREHOUSE_VERIFIED:    { icon: "🔐", color: "#7C3AED", label: "OTP Verified (Warehouse)" },
   OTP_DELIVERY_VERIFIED:     { icon: "🔐", color: "#7C3AED", label: "OTP Verified (Delivery)" },
@@ -417,7 +420,7 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
   };
 
   const TrackingProgress = ({ status }) => {
-    const steps  = ["searching_rider","picked_up","pending_warehouse","at_warehouse","out_for_delivery","delivered"];
+    const steps  = ["searching_rider","picked_up","pending_warehouse","at_warehouse","out_for_delivery","pending_delivery","delivered"];
     const labels = ["Searching","Collected","At Hub","Dispatched","On the Way","Delivered"];
     const icons  = ["🔍","📦","🏭","🚀","🏍️","✅"];
     // map status to step index — pending_warehouse and at_warehouse both count as step 2
@@ -854,8 +857,8 @@ function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onCollected
 // ============================================================
 // ADMIN DASHBOARD
 // ============================================================
-function AdminDashboard({ packages, riders, customers, transitLogs, onDispatch, onAcceptAtWarehouse, onAddRider, accounts }) {
-  const [view, setView] = useState("hub");
+function AdminDashboard({ packages, riders, customers, transitLogs, onDispatch, onAcceptAtWarehouse, onConfirmDelivery, onAddRider, accounts }) {
+  const [view, setView] = useState("requests");
   const [selectedPkg, setSelectedPkg] = useState(null);
   const [selectedRider, setSelectedRider] = useState("");
   const [showAddRider, setShowAddRider] = useState(false);
@@ -886,7 +889,9 @@ function AdminDashboard({ packages, riders, customers, transitLogs, onDispatch, 
 
   const pendingAcceptance = packages.filter(p => p.status === "pending_warehouse");
   const atHub = packages.filter(p => p.status === "at_warehouse");
-  const inTransit = packages.filter(p => ["searching_rider","picked_up","out_for_delivery"].includes(p.status));
+  const pendingDelivery = packages.filter(p => p.status === "pending_delivery");
+  const newRequests = packages.filter(p => p.status === "searching_rider");
+  const inTransit = packages.filter(p => ["searching_rider","picked_up","pending_warehouse","out_for_delivery","pending_delivery"].includes(p.status));
   const delivered = packages.filter(p => p.status === "delivered");
   const totalFees = packages.reduce((s, p) => s + p.total, 0);
   const totalValue = inTransit.reduce((s, p) => s + p.declaredValue, 0);
@@ -910,7 +915,7 @@ function AdminDashboard({ packages, riders, customers, transitLogs, onDispatch, 
           </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          {[["hub","📦 Hub Inventory"],["riders","🏍️ Riders"],["customers","👥 Customers"],["logs","📋 Custody Logs"],["revenue","💰 Revenue"]].map(([v, l]) => (
+          {[["requests","📋 Requests"],["hub","📦 Hub Inventory"],["riders","🏍️ Riders"],["customers","👥 Customers"],["logs","📋 Chain of Custody"],["revenue","💰 Revenue"]].map(([v, l]) => (
             <button key={v} onClick={() => setView(v)} style={{ padding: "6px 14px", border: "none", background: view === v ? "#DC2626" : "#F3F4F6", color: view === v ? "#fff" : "#6B7280", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "inherit" }}>{l}</button>
           ))}
         </div>
@@ -918,11 +923,13 @@ function AdminDashboard({ packages, riders, customers, transitLogs, onDispatch, 
 
       <div style={{ padding: 24 }}>
         {/* Stats Bar */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 12, marginBottom: 24 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 10, marginBottom: 24 }}>
           {[
             { label: "Pending Accept", value: pendingAcceptance.length, sub: "need action", color: "#F59E0B" },
             { label: "At Hub", value: atHub.length, sub: "ready", color: "#6366F1" },
             { label: "In Transit", value: inTransit.length, sub: "packages", color: "#EF4444" },
+            { label: "New Requests", value: newRequests.length, sub: "incoming", color: "#0EA5E9" },
+            { label: "Pending Delivery", value: pendingDelivery.length, sub: "to confirm", color: "#F97316" },
             { label: "Delivered Today", value: delivered.length, sub: "packages", color: "#10B981" },
             { label: "Customers", value: customers.length, sub: "registered", color: "#7C3AED" },
             { label: "Revenue", value: `KES ${totalFees.toLocaleString()}`, sub: "collected", color: "#DC2626" },
@@ -976,6 +983,59 @@ function AdminDashboard({ packages, riders, customers, transitLogs, onDispatch, 
                         {pkg.isHighValue && <div style={{ marginBottom: 10 }}><HighValueBadge /></div>}
                         <Btn onClick={() => onAcceptAtWarehouse(pkg.id)} variant="success" style={{ width: "100%" }}>
                           ✅ Accept Package at Warehouse
+                        </Btn>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ── SECTION 1.5: Pending Delivery Confirmation ── */}
+            {pendingDelivery.length > 0 && (
+              <div style={{ marginBottom: 28 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#F97316", boxShadow: "0 0 0 3px rgba(249,115,22,0.2)" }} />
+                  <div style={{ fontSize: 16, fontWeight: 800, color: "#9A3412" }}>Delivery Confirmations — {pendingDelivery.length} Package{pendingDelivery.length !== 1 ? "s" : ""}</div>
+                  <span style={{ background: "#FFF7ED", color: "#9A3412", padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>ACTION REQUIRED</span>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 14 }}>
+                  {pendingDelivery.map(pkg => {
+                    const deliveryRider = riders.find(r => r.id === pkg.riderDeliveryId);
+                    const pkgLogs = transitLogs.filter(l => l.packageId === pkg.id);
+                    const reportedLog = [...pkgLogs].reverse().find(l => l.event === "DELIVERY_REPORTED");
+                    return (
+                      <Card key={pkg.id} style={{ border: "2px solid #FED7AA", background: "#FFF7ED" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                          <div>
+                            <div style={{ fontFamily: "monospace", fontWeight: 800, fontSize: 14, color: "#111827" }}>{pkg.trackingCode}</div>
+                            <div style={{ fontSize: 13, color: "#374151", marginTop: 2 }}>{pkg.description}</div>
+                          </div>
+                          <StatusBadge status={pkg.status} />
+                        </div>
+                        <div style={{ background: "#fff", borderRadius: 10, padding: "10px 12px", marginBottom: 12 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                            <span style={{ color: "#6B7280" }}>Customer</span>
+                            <span style={{ fontWeight: 700, color: "#111827" }}>{pkg.customerName}</span>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                            <span style={{ color: "#6B7280" }}>Delivered by</span>
+                            <span style={{ fontWeight: 700, color: "#DC2626" }}>🏍️ {deliveryRider?.name || "Unknown Rider"}</span>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                            <span style={{ color: "#6B7280" }}>Delivered to</span>
+                            <span style={{ fontWeight: 700, color: "#374151" }}>{pkg.deliveryAddress}</span>
+                          </div>
+                          {reportedLog && (
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                              <span style={{ color: "#6B7280" }}>Reported at</span>
+                              <span style={{ fontWeight: 600, color: "#374151" }}>{new Date(reportedLog.createdAt).toLocaleString()}</span>
+                            </div>
+                          )}
+                        </div>
+                        {pkg.isHighValue && <div style={{ marginBottom: 10 }}><HighValueBadge /></div>}
+                        <Btn onClick={() => onConfirmDelivery(pkg.id)} variant="success" style={{ width: "100%" }}>
+                          ✅ Confirm Delivery
                         </Btn>
                       </Card>
                     );
@@ -1152,6 +1212,107 @@ function AdminDashboard({ packages, riders, customers, transitLogs, onDispatch, 
             </div>
           </div>
         )}
+        {view === "requests" && (
+          <div>
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 20, fontWeight: 900, color: "#111827" }}>Incoming Requests</div>
+              <div style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>All orders — review customer, pickup, destination and assign riders accordingly</div>
+            </div>
+
+            {packages.length === 0 ? (
+              <Card style={{ textAlign: "center", padding: 48 }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#111827" }}>No requests yet</div>
+              </Card>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {[...packages].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map(pkg => {
+                  const collRider = riders.find(r => r.id === pkg.riderCollectionId);
+                  const delRider  = riders.find(r => r.id === pkg.riderDeliveryId);
+                  const zoneInfo  = getZoneInfo(pkg.deliveryZone);
+                  const tier      = TIER_BADGE[zoneInfo.tier];
+                  return (
+                    <Card key={pkg.id} style={{ border: "1px solid #F3F4F6" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8 }}>
+                        {/* Left: tracking + status */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, flex: "0 0 auto" }}>
+                          <div>
+                            <div style={{ fontFamily: "monospace", fontWeight: 800, fontSize: 15, color: "#DC2626" }}>{pkg.trackingCode}</div>
+                            <div style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>{new Date(pkg.createdAt).toLocaleString()}</div>
+                          </div>
+                          <StatusBadge status={pkg.status} />
+                          {pkg.isHighValue && <HighValueBadge />}
+                        </div>
+                        {/* Right: fee */}
+                        <div style={{ textAlign: "right", flex: "0 0 auto" }}>
+                          <div style={{ fontSize: 18, fontWeight: 900, color: "#DC2626" }}>KES {pkg.total}</div>
+                          {pkg.protectionFee > 0 && <div style={{ fontSize: 11, color: "#9CA3AF" }}>incl. KES {pkg.protectionFee} protection</div>}
+                        </div>
+                      </div>
+
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginTop: 14 }}>
+                        {/* Customer info */}
+                        <div style={{ background: "#F9FAFB", borderRadius: 10, padding: "10px 12px" }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Customer</div>
+                          <div style={{ fontSize: 14, fontWeight: 800, color: "#111827" }}>{pkg.customerName}</div>
+                          <div style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>
+                            {(() => { const cust = customers.find(c => c.id === pkg.customerId); return cust ? <><div>{cust.phone}</div><div style={{ fontSize: 11, color: "#9CA3AF" }}>{cust.email}</div></> : null; })()}
+                          </div>
+                        </div>
+
+                        {/* Route */}
+                        <div style={{ background: "#F9FAFB", borderRadius: 10, padding: "10px 12px" }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Route</div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                            <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
+                              <span style={{ fontSize: 12, marginTop: 1 }}>📍</span>
+                              <div>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: "#6B7280", textTransform: "uppercase" }}>From</div>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: "#111827" }}>{pkg.pickupAddress}</div>
+                              </div>
+                            </div>
+                            <div style={{ height: 1, background: "#E5E7EB", margin: "2px 0" }} />
+                            <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
+                              <span style={{ fontSize: 12, marginTop: 1 }}>🏠</span>
+                              <div>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: "#6B7280", textTransform: "uppercase" }}>To</div>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: "#111827" }}>{pkg.deliveryAddress}</div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Zone + Riders */}
+                        <div style={{ background: "#F9FAFB", borderRadius: 10, padding: "10px 12px" }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Assignment</div>
+                          <div style={{ marginBottom: 6 }}>
+                            <span style={{ background: tier.bg, color: tier.color, padding: "2px 10px", borderRadius: 20, fontSize: 12, fontWeight: 700 }}>{pkg.deliveryZone}</span>
+                          </div>
+                          <div style={{ fontSize: 12, color: "#6B7280", marginTop: 4 }}>
+                            <span style={{ fontWeight: 700, color: "#374151" }}>Collection: </span>
+                            {collRider ? <span style={{ color: "#DC2626", fontWeight: 700 }}>🏍️ {collRider.name}</span> : <span style={{ color: "#9CA3AF" }}>Unassigned</span>}
+                          </div>
+                          <div style={{ fontSize: 12, color: "#6B7280", marginTop: 3 }}>
+                            <span style={{ fontWeight: 700, color: "#374151" }}>Delivery: </span>
+                            {delRider ? <span style={{ color: "#10B981", fontWeight: 700 }}>🏍️ {delRider.name}</span> : <span style={{ color: "#9CA3AF" }}>Unassigned</span>}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Package details strip */}
+                      <div style={{ display: "flex", gap: 12, marginTop: 12, paddingTop: 12, borderTop: "1px solid #F3F4F6", flexWrap: "wrap" }}>
+                        <span style={{ fontSize: 12, color: "#6B7280" }}>📦 <strong style={{ color: "#374151" }}>{pkg.description}</strong></span>
+                        <span style={{ fontSize: 12, color: "#6B7280" }}>Size: <strong style={{ color: "#374151", textTransform: "capitalize" }}>{pkg.size}</strong></span>
+                        <span style={{ fontSize: 12, color: "#6B7280" }}>Value: <strong style={{ color: "#374151" }}>KES {pkg.declaredValue.toLocaleString()}</strong></span>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {view === "customers" && (
           <div>
             {/* Header */}
@@ -1865,9 +2026,9 @@ export default function App() {
 
   const onDispatch = async (pkgId, riderId) => {
     const rider = riders.find(r => r.id === riderId);
-    await updatePkg(pkgId, { riderDeliveryId: riderId, status: "out_for_delivery" });
-    await addLog(pkgId, user.id, "admin", user.name, "DISPATCHED_TO_RIDER", "Baruk Central, CBD", `Assigned to ${rider?.name}`);
-    await addLog(pkgId, riderId, "rider", rider?.name, "OUT_FOR_DELIVERY", "Baruk Central, CBD");
+    // Keep at_warehouse — rider must physically collect before going out
+    await updatePkg(pkgId, { riderDeliveryId: riderId, status: "at_warehouse" });
+    await addLog(pkgId, user.id, "admin", user.name, "DISPATCHED_TO_RIDER", "Baruk Central, CBD", `Assigned to ${rider?.name} — awaiting collection`);
   };
 
   const onAcceptDelivery = async (pkgId, riderId) => {
@@ -1888,8 +2049,15 @@ export default function App() {
 
   const onMarkDelivered = async (pkgId) => {
     const pkg = packages.find(p => p.id === pkgId);
+    await updatePkg(pkgId, { status: "pending_delivery" });
+    await addLog(pkgId, user.id, "rider", user.name, "DELIVERY_REPORTED", pkg?.deliveryAddress, "Rider reports package delivered — awaiting admin confirmation");
+  };
+
+  // ── Admin confirms final delivery ──
+  const onConfirmDelivery = async (pkgId) => {
+    const pkg = packages.find(p => p.id === pkgId);
     await updatePkg(pkgId, { status: "delivered" });
-    await addLog(pkgId, user.id, "rider", user.name, "DELIVERED", pkg?.deliveryAddress, "Package delivered successfully");
+    await addLog(pkgId, user.id, "admin", user.name, "DELIVERY_CONFIRMED", pkg?.deliveryAddress, "Delivery confirmed by admin");
   };
 
   // ── Admin creates rider account ──
@@ -1946,7 +2114,7 @@ export default function App() {
       <TopBar />
       {user.role === "customer" && <CustomerApp packages={packages.filter(p => p.customerId === user.id)} onCreatePackage={onCreatePackage} transitLogs={logs} />}
       {user.role === "rider"    && <RiderApp packages={packages} onAcceptCollection={onAcceptCollection} onMarkAtWarehouse={onMarkAtWarehouse} onCollectedFromWarehouse={onCollectedFromWarehouse} onAcceptDelivery={onAcceptDelivery} onVerifyOTP={onVerifyOTP} onMarkDelivered={onMarkDelivered} transitLogs={logs} currentRider={user} />}
-      {user.role === "admin"    && <AdminDashboard packages={packages} riders={riders} customers={customers} transitLogs={logs} onDispatch={onDispatch} onAcceptAtWarehouse={onAcceptAtWarehouse} onAddRider={onAddRider} accounts={[...riders, user]} />}
+      {user.role === "admin"    && <AdminDashboard packages={packages} riders={riders} customers={customers} transitLogs={logs} onDispatch={onDispatch} onAcceptAtWarehouse={onAcceptAtWarehouse} onConfirmDelivery={onConfirmDelivery} onAddRider={onAddRider} accounts={[...riders, user]} />}
       <InstallBanner />
     </div>
   );
