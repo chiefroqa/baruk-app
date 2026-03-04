@@ -715,38 +715,37 @@ function CustomerApp({ packages, onCreatePackage, transitLogs, riders = [] }) {
                       </div>
                     )}
 
-                    {(() => {
-                      const collRider = pkg.riderCollectionId ? riders.find(r => r.id === pkg.riderCollectionId) : null;
-                      const delRider  = pkg.riderDeliveryId   ? riders.find(r => r.id === pkg.riderDeliveryId)   : null;
-                      if (!collRider && !delRider) return null;
-                      return (
-                        <div style={{ marginBottom: 14 }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Your Rider</div>
-                          {collRider && (
-                            <div style={{ background: "#F9FAFB", border: "1px solid #E5E7EB", borderRadius: 10, padding: "10px 12px", marginBottom: 6 }}>
-                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                <div>
-                                  <div style={{ fontSize: 13, fontWeight: 800, color: "#111827" }}>🏍️ {collRider.name}</div>
-                                  <div style={{ fontSize: 11, color: "#6B7280", marginTop: 1 }}>Collection rider · {collRider.phone}</div>
-                                </div>
-                                <a href={`tel:${collRider.phone}`} style={{ background: "#DC2626", color: "#fff", padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700, textDecoration: "none" }}>📞 Call</a>
+                    {(pkg.riderCollectionName || pkg.riderDeliveryName) && (
+                      <div style={{ marginBottom: 14 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Your Rider</div>
+                        {pkg.riderCollectionName && (
+                          <div style={{ background: "#F9FAFB", border: "1px solid #E5E7EB", borderRadius: 10, padding: "10px 12px", marginBottom: 6 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <div>
+                                <div style={{ fontSize: 13, fontWeight: 800, color: "#111827" }}>🏍️ {pkg.riderCollectionName}</div>
+                                <div style={{ fontSize: 11, color: "#6B7280", marginTop: 1 }}>Collection rider · {pkg.riderCollectionPhone}</div>
                               </div>
+                              {pkg.riderCollectionPhone && (
+                                <a href={`tel:${pkg.riderCollectionPhone}`} style={{ background: "#DC2626", color: "#fff", padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700, textDecoration: "none" }}>📞 Call</a>
+                              )}
                             </div>
-                          )}
-                          {delRider && delRider.id !== collRider?.id && (
-                            <div style={{ background: "#F9FAFB", border: "1px solid #E5E7EB", borderRadius: 10, padding: "10px 12px" }}>
-                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                <div>
-                                  <div style={{ fontSize: 13, fontWeight: 800, color: "#111827" }}>🏍️ {delRider.name}</div>
-                                  <div style={{ fontSize: 11, color: "#6B7280", marginTop: 1 }}>Delivery rider · {delRider.phone}</div>
-                                </div>
-                                <a href={`tel:${delRider.phone}`} style={{ background: "#10B981", color: "#fff", padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700, textDecoration: "none" }}>📞 Call</a>
+                          </div>
+                        )}
+                        {pkg.riderDeliveryName && pkg.riderDeliveryName !== pkg.riderCollectionName && (
+                          <div style={{ background: "#F9FAFB", border: "1px solid #E5E7EB", borderRadius: 10, padding: "10px 12px" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <div>
+                                <div style={{ fontSize: 13, fontWeight: 800, color: "#111827" }}>🏍️ {pkg.riderDeliveryName}</div>
+                                <div style={{ fontSize: 11, color: "#6B7280", marginTop: 1 }}>Delivery rider · {pkg.riderDeliveryPhone}</div>
                               </div>
+                              {pkg.riderDeliveryPhone && (
+                                <a href={`tel:${pkg.riderDeliveryPhone}`} style={{ background: "#10B981", color: "#fff", padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700, textDecoration: "none" }}>📞 Call</a>
+                              )}
                             </div>
-                          )}
-                        </div>
-                      );
-                    })()}
+                          </div>
+                        )}
+                      </div>
+                    )}
                     <div style={{ fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 10 }}>Chain of Custody</div>
                     <Timeline logs={transitLogs.filter(l => l.packageId === pkg.id)} />
                   </div>
@@ -838,13 +837,13 @@ function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onCollected
             </div>
           ) : null;
         })()}
-        {isMyDelivery && (pkg.recipientName || pkg.recipientPhone) && (
+        {isMyDelivery && (
           <div style={{ marginTop: 10, background: "#F0FDF4", border: "1.5px solid #6EE7B7", borderRadius: 10, padding: "10px 12px" }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: "#065F46", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>🏠 Recipient Contact</div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 800, color: "#111827" }}>{pkg.recipientName || "—"}</div>
-                <div style={{ fontSize: 12, color: "#6B7280", marginTop: 1 }}>{pkg.recipientPhone || "—"}</div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: "#111827" }}>{pkg.recipientName || "(name not provided)"}</div>
+                <div style={{ fontSize: 12, color: "#6B7280", marginTop: 1 }}>{pkg.recipientPhone || pkg.deliveryAddress}</div>
               </div>
               {pkg.recipientPhone && (
                 <a href={`tel:${pkg.recipientPhone}`} style={{ background: "#10B981", color: "#fff", padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700, textDecoration: "none", flexShrink: 0 }}>📞 Call</a>
@@ -1857,7 +1856,11 @@ const dbPkgToApp = (p) => ({
   recipientName:        p.recipient_name,
   recipientPhone:       p.recipient_phone,
   riderCollectionId:    p.rider_collection_id,
+  riderCollectionName:  p.rider_collection_name,
+  riderCollectionPhone: p.rider_collection_phone,
   riderDeliveryId:      p.rider_delivery_id,
+  riderDeliveryName:    p.rider_delivery_name,
+  riderDeliveryPhone:   p.rider_delivery_phone,
   pickupAddress:        p.pickup_address,
   deliveryAddress:      p.delivery_address,
   deliveryZone:         p.delivery_zone,
@@ -2324,11 +2327,15 @@ export default function App() {
 
     // 2. Write to Supabase
     const dbUpdates = {};
-    if (updates.status               !== undefined) dbUpdates.status                    = updates.status;
-    if (updates.riderCollectionId    !== undefined) dbUpdates.rider_collection_id        = updates.riderCollectionId;
-    if (updates.riderDeliveryId      !== undefined) dbUpdates.rider_delivery_id          = updates.riderDeliveryId;
-    if (updates.otpWarehouseVerified !== undefined) dbUpdates.otp_warehouse_verified     = updates.otpWarehouseVerified;
-    if (updates.otpDeliveryVerified  !== undefined) dbUpdates.otp_delivery_verified      = updates.otpDeliveryVerified;
+    if (updates.status                !== undefined) dbUpdates.status                     = updates.status;
+    if (updates.riderCollectionId     !== undefined) dbUpdates.rider_collection_id         = updates.riderCollectionId;
+    if (updates.riderCollectionName   !== undefined) dbUpdates.rider_collection_name       = updates.riderCollectionName;
+    if (updates.riderCollectionPhone  !== undefined) dbUpdates.rider_collection_phone      = updates.riderCollectionPhone;
+    if (updates.riderDeliveryId       !== undefined) dbUpdates.rider_delivery_id           = updates.riderDeliveryId;
+    if (updates.riderDeliveryName     !== undefined) dbUpdates.rider_delivery_name         = updates.riderDeliveryName;
+    if (updates.riderDeliveryPhone    !== undefined) dbUpdates.rider_delivery_phone        = updates.riderDeliveryPhone;
+    if (updates.otpWarehouseVerified  !== undefined) dbUpdates.otp_warehouse_verified      = updates.otpWarehouseVerified;
+    if (updates.otpDeliveryVerified   !== undefined) dbUpdates.otp_delivery_verified       = updates.otpDeliveryVerified;
 
     console.log("[updatePkg] writing to DB:", { id, dbUpdates });
     const { data: updatedRow, error } = await supabase.from("packages").update(dbUpdates).eq("id", id).select().single();
@@ -2374,7 +2381,12 @@ export default function App() {
   // ── Rider actions ──
   const onAcceptCollection = async (pkgId, riderId) => {
     const pkg = packages.find(p => p.id === pkgId);
-    await updatePkg(pkgId, { riderCollectionId: riderId, status: "picked_up" });
+    await updatePkg(pkgId, {
+      riderCollectionId:    riderId,
+      riderCollectionName:  user.name,
+      riderCollectionPhone: user.phone || "",
+      status:               "picked_up",
+    });
     await addLog(pkgId, user.id, "rider", user.name, "COLLECTED_FROM_CUSTOMER", pkg?.pickupAddress, "Package collected from customer");
   };
 
@@ -2398,10 +2410,13 @@ export default function App() {
   };
 
   const onDispatch = async (pkgId, riderId) => {
-    const rider = riders.find(r => r.id === riderId);
-    // status stays at_warehouse — rider must physically collect before going out
-    await updatePkg(pkgId, { riderDeliveryId: riderId });
-    await addLog(pkgId, user.id, "admin", user.name, "DISPATCHED_TO_RIDER", "Baruk Central, CBD", `Assigned to ${rider?.name || riderId} — awaiting collection from hub`);
+    const assignedRider = riders.find(r => r.id === riderId);
+    await updatePkg(pkgId, {
+      riderDeliveryId:    riderId,
+      riderDeliveryName:  assignedRider?.name  || "",
+      riderDeliveryPhone: assignedRider?.phone || "",
+    });
+    await addLog(pkgId, user.id, "admin", user.name, "DISPATCHED_TO_RIDER", "Baruk Central, CBD", `Assigned to ${assignedRider?.name || riderId} — awaiting collection from hub`);
   };
 
   const onAcceptDelivery = async (pkgId) => {
