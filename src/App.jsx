@@ -713,9 +713,14 @@ function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onCollected
   const [otpInput, setOtpInput] = useState({});
   const [otpError, setOtpError] = useState({});
 
-  const collectionFeed = packages.filter(p => p.status === "searching_rider" && p.deliveryZone !== rider.zone);
+  // All packages that have no rider claimed yet
+  const collectionFeed = packages.filter(p => p.status === "searching_rider" && !p.riderCollectionId);
+  // Packages assigned to THIS rider for delivery that they haven't collected yet
+  const deliveryFeed = packages.filter(p => p.riderDeliveryId === rider.id && p.status === "at_warehouse");
+  // Every package this rider is involved in (collection or delivery), any status
   const myActive = packages.filter(p => p.riderCollectionId === rider.id || p.riderDeliveryId === rider.id);
-  const deliveryFeed = packages.filter(p => p.status === "at_warehouse" && p.deliveryZone === rider.zone && !p.riderDeliveryId);
+  const myCompleted = myActive.filter(p => p.status === "delivered");
+  const myInProgress = myActive.filter(p => p.status !== "delivered");
 
   const handleOTPVerify = (pkg, type) => {
     const entered = otpInput[`${pkg.id}-${type}`] || "";
@@ -753,24 +758,36 @@ function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onCollected
           <span>KES {pkg.declaredValue.toLocaleString()} value</span>
         </div>
 
-        {/* Actions */}
+        {/* Actions — driven by exact status + rider role */}
         <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+
+          {/* ── COLLECTION SIDE ── */}
           {pkg.status === "searching_rider" && !isMyCollection && (
             <Btn onClick={() => onAcceptCollection(pkg.id, rider.id)} variant="primary">📦 Accept Collection Job</Btn>
           )}
           {pkg.status === "searching_rider" && isMyCollection && (
-            <div style={{ background: "#FEF3C7", border: "1.5px solid #FDE68A", borderRadius: 10, padding: "10px 12px", fontSize: 13, color: "#92400E", fontWeight: 700 }}>
-              ✅ Accepted — go collect & bring to warehouse
+            <div style={{ background: "#FEF3C7", border: "1.5px solid #FDE68A", borderRadius: 10, padding: "10px 12px" }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: "#92400E" }}>✅ Job accepted</div>
+              <div style={{ fontSize: 12, color: "#B45309", marginTop: 2 }}>Go collect the package and bring it to the warehouse.</div>
             </div>
           )}
           {pkg.status === "picked_up" && isMyCollection && (
-            <Btn onClick={() => onMarkAtWarehouse(pkg.id)} variant="success">🏭 Mark: Arrived at Warehouse</Btn>
+            <Btn onClick={() => onMarkAtWarehouse(pkg.id)} variant="success">🏭 Arrived at Warehouse</Btn>
           )}
           {pkg.status === "pending_warehouse" && isMyCollection && (
-            <div style={{ background: "#EEF2FF", border: "1.5px solid #C7D2FE", borderRadius: 10, padding: "10px 12px", fontSize: 13, color: "#4338CA", fontWeight: 700 }}>
-              ⏳ Waiting for warehouse acceptance...
+            <div style={{ background: "#EEF2FF", border: "1.5px solid #C7D2FE", borderRadius: 10, padding: "10px 12px" }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: "#3730A3" }}>⏳ Waiting for warehouse acceptance</div>
+              <div style={{ fontSize: 12, color: "#4338CA", marginTop: 2 }}>The admin will confirm receipt of the package.</div>
             </div>
           )}
+          {pkg.status === "at_warehouse" && isMyCollection && !isMyDelivery && (
+            <div style={{ background: "#F0FDF4", border: "1.5px solid #6EE7B7", borderRadius: 10, padding: "10px 12px" }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: "#065F46" }}>✅ Accepted at warehouse</div>
+              <div style={{ fontSize: 12, color: "#047857", marginTop: 2 }}>Package received. Awaiting dispatch to delivery rider.</div>
+            </div>
+          )}
+
+          {/* ── OTP for high-value warehouse handoff ── */}
           {needsWarehouseOTP && (
             <div style={{ background: "#FEF2F2", border: "1.5px solid #FCA5A5", borderRadius: 10, padding: 12 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: "#7F1D1D", marginBottom: 8 }}>🔐 Enter Warehouse Manager OTP</div>
@@ -782,25 +799,37 @@ function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onCollected
               {otpError[`${pkg.id}-warehouse`] && <div style={{ color: "#EF4444", fontSize: 12, marginTop: 6 }}>❌ Incorrect OTP. Try again.</div>}
             </div>
           )}
-          {pkg.status === "at_warehouse" && !isMyDelivery && pkg.deliveryZone === rider.zone && (
-            <Btn onClick={() => onAcceptDelivery(pkg.id, rider.id)} variant="primary">Accept Delivery</Btn>
+
+          {/* ── DELIVERY SIDE ── */}
+          {pkg.status === "at_warehouse" && isMyDelivery && (
+            <Btn onClick={() => onCollectedFromWarehouse(pkg.id)} variant="primary">🏍️ Collected from Hub — Out for Delivery</Btn>
           )}
-          {needsDeliveryOTP && (
-            <div style={{ background: "#FEF2F2", border: "1.5px solid #FCA5A5", borderRadius: 10, padding: 12 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#7F1D1D", marginBottom: 8 }}>🔐 Customer OTP Verification</div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <input maxLength={4} value={otpInput[`${pkg.id}-delivery`] || ""} onChange={e => setOtpInput(o => ({...o, [`${pkg.id}-delivery`]: e.target.value}))}
-                  placeholder="- - - -" style={{ flex: 1, padding: "8px 12px", border: `1.5px solid ${otpError[`${pkg.id}-delivery`] ? "#EF4444" : "#E5E7EB"}`, borderRadius: 8, fontSize: 18, textAlign: "center", letterSpacing: 6, fontFamily: "monospace" }} />
-                <Btn onClick={() => handleOTPVerify(pkg, "delivery")} variant="purple" size="sm">Verify</Btn>
+          {pkg.status === "out_for_delivery" && isMyDelivery && (
+            needsDeliveryOTP ? (
+              <div style={{ background: "#FEF2F2", border: "1.5px solid #FCA5A5", borderRadius: 10, padding: 12 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#7F1D1D", marginBottom: 8 }}>🔐 Customer OTP Verification</div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input maxLength={4} value={otpInput[`${pkg.id}-delivery`] || ""} onChange={e => setOtpInput(o => ({...o, [`${pkg.id}-delivery`]: e.target.value}))}
+                    placeholder="- - - -" style={{ flex: 1, padding: "8px 12px", border: `1.5px solid ${otpError[`${pkg.id}-delivery`] ? "#EF4444" : "#E5E7EB"}`, borderRadius: 8, fontSize: 18, textAlign: "center", letterSpacing: 6, fontFamily: "monospace" }} />
+                  <Btn onClick={() => handleOTPVerify(pkg, "delivery")} variant="purple" size="sm">Verify</Btn>
+                </div>
+                {otpError[`${pkg.id}-delivery`] && <div style={{ color: "#EF4444", fontSize: 12, marginTop: 6 }}>❌ Incorrect OTP. Try again.</div>}
               </div>
-              {otpError[`${pkg.id}-delivery`] && <div style={{ color: "#EF4444", fontSize: 12, marginTop: 6 }}>❌ Incorrect OTP. Try again.</div>}
+            ) : (
+              <Btn onClick={() => onMarkDelivered(pkg.id)} variant="success">🎉 Mark as Delivered</Btn>
+            )
+          )}
+          {pkg.status === "pending_delivery" && isMyDelivery && (
+            <div style={{ background: "#FFF7ED", border: "1.5px solid #FED7AA", borderRadius: 10, padding: "10px 12px" }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: "#9A3412" }}>📬 Delivery reported</div>
+              <div style={{ fontSize: 12, color: "#C2410C", marginTop: 2 }}>Waiting for admin to confirm delivery.</div>
             </div>
           )}
-          {pkg.status === "at_warehouse" && isMyDelivery && (
-            <Btn onClick={() => onCollectedFromWarehouse(pkg.id)} variant="primary">🏍️ Collected — Heading to Customer</Btn>
-          )}
-          {pkg.status === "out_for_delivery" && isMyDelivery && (!pkg.isHighValue || pkg.otpDeliveryVerified) && (
-            <Btn onClick={() => onMarkDelivered(pkg.id)} variant="success">🎉 Mark as Delivered</Btn>
+          {pkg.status === "delivered" && (
+            <div style={{ background: "#ECFDF5", border: "1.5px solid #6EE7B7", borderRadius: 10, padding: "10px 12px" }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: "#065F46" }}>🎉 Delivered & Confirmed</div>
+              <div style={{ fontSize: 12, color: "#047857", marginTop: 2 }}>This delivery is complete.</div>
+            </div>
           )}
         </div>
       </Card>
@@ -822,8 +851,16 @@ function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onCollected
           </div>
         </div>
         <div style={{ display: "flex", gap: 2, marginTop: 16 }}>
-          {[["collection","🏠 Collection Feed"],["delivery","📦 Delivery Feed"],["active","⚡ My Active"]].map(([v,l]) => (
-            <button key={v} onClick={() => setFeed(v)} style={{ flex: 1, padding: "10px 4px", border: "none", background: feed === v ? "#fff" : "transparent", color: feed === v ? "#1F2937" : "rgba(255,255,255,0.6)", fontWeight: 600, borderRadius: "8px 8px 0 0", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>{l}</button>
+          {[
+            ["collection", "📦 Collect", collectionFeed.length],
+            ["delivery",   "🚀 Deliver", deliveryFeed.length],
+            ["active",     "⚡ Active",  myInProgress.length],
+            ["done",       "✅ Done",    myCompleted.length],
+          ].map(([v, l, count]) => (
+            <button key={v} onClick={() => setFeed(v)} style={{ flex: 1, padding: "8px 2px", border: "none", background: feed === v ? "#fff" : "transparent", color: feed === v ? "#1F2937" : "rgba(255,255,255,0.6)", fontWeight: 700, borderRadius: "8px 8px 0 0", cursor: "pointer", fontSize: 10, fontFamily: "inherit", position: "relative" }}>
+              {l}
+              {count > 0 && <span style={{ position: "absolute", top: 4, right: 6, background: feed === v ? "#DC2626" : "rgba(220,38,38,0.8)", color: "#fff", borderRadius: "50%", width: 16, height: 16, fontSize: 9, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900 }}>{count}</span>}
+            </button>
           ))}
         </div>
       </div>
@@ -831,22 +868,34 @@ function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onCollected
       <div style={{ padding: "16px" }}>
         {feed === "collection" && (
           <div>
-            <div style={{ fontSize: 13, color: "#6B7280", marginBottom: 12 }}>Packages in your zone to collect & bring to Hub:</div>
-            {collectionFeed.length === 0 ? <Card style={{ textAlign: "center", color: "#9CA3AF" }}>No collection requests right now</Card> :
-              collectionFeed.map(p => <PkgCard key={p.id} pkg={p} />)}
+            <div style={{ fontSize: 13, color: "#6B7280", marginBottom: 12 }}>Open collection jobs — accept one to pick up from customer:</div>
+            {collectionFeed.length === 0
+              ? <Card style={{ textAlign: "center", padding: "32px 20px", color: "#9CA3AF" }}><div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>No collection jobs right now</Card>
+              : collectionFeed.map(p => <PkgCard key={p.id} pkg={p} />)}
           </div>
         )}
         {feed === "delivery" && (
           <div>
-            <div style={{ fontSize: 13, color: "#6B7280", marginBottom: 12 }}>Packages at Hub destined for <strong>{rider.zone}</strong>:</div>
-            {deliveryFeed.length === 0 ? <Card style={{ textAlign: "center", color: "#9CA3AF" }}>No deliveries waiting for your zone</Card> :
-              deliveryFeed.map(p => <PkgCard key={p.id} pkg={p} />)}
+            <div style={{ fontSize: 13, color: "#6B7280", marginBottom: 12 }}>Packages dispatched to you — collect from hub and deliver:</div>
+            {deliveryFeed.length === 0
+              ? <Card style={{ textAlign: "center", padding: "32px 20px", color: "#9CA3AF" }}><div style={{ fontSize: 32, marginBottom: 8 }}>🏭</div>No deliveries assigned to you yet</Card>
+              : deliveryFeed.map(p => <PkgCard key={p.id} pkg={p} />)}
           </div>
         )}
         {feed === "active" && (
           <div>
-            {myActive.length === 0 ? <Card style={{ textAlign: "center", color: "#9CA3AF" }}>No active packages</Card> :
-              myActive.map(p => <PkgCard key={p.id} pkg={p} />)}
+            <div style={{ fontSize: 13, color: "#6B7280", marginBottom: 12 }}>Your packages currently in progress:</div>
+            {myInProgress.length === 0
+              ? <Card style={{ textAlign: "center", padding: "32px 20px", color: "#9CA3AF" }}><div style={{ fontSize: 32, marginBottom: 8 }}>✨</div>Nothing active right now</Card>
+              : myInProgress.map(p => <PkgCard key={p.id} pkg={p} />)}
+          </div>
+        )}
+        {feed === "done" && (
+          <div>
+            <div style={{ fontSize: 13, color: "#6B7280", marginBottom: 12 }}>Completed deliveries:</div>
+            {myCompleted.length === 0
+              ? <Card style={{ textAlign: "center", padding: "32px 20px", color: "#9CA3AF" }}><div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>No completed deliveries yet</Card>
+              : myCompleted.map(p => <PkgCard key={p.id} pkg={p} />)}
           </div>
         )}
       </div>
@@ -888,6 +937,8 @@ function AdminDashboard({ packages, riders, customers, transitLogs, onDispatch, 
   const [otpError, setOtpError] = useState(false);
 
   const pendingAcceptance = packages.filter(p => p.status === "pending_warehouse");
+  const atHubUnassigned = packages.filter(p => p.status === "at_warehouse" && !p.riderDeliveryId);
+  const atHubDispatched = packages.filter(p => p.status === "at_warehouse" && p.riderDeliveryId);
   const atHub = packages.filter(p => p.status === "at_warehouse");
   const pendingDelivery = packages.filter(p => p.status === "pending_delivery");
   const newRequests = packages.filter(p => p.status === "searching_rider");
@@ -1044,77 +1095,98 @@ function AdminDashboard({ packages, riders, customers, transitLogs, onDispatch, 
               </div>
             )}
 
-            {/* ── SECTION 2: Hub Inventory — Ready to Dispatch ── */}
-            <div>
+            {/* ── SECTION 2: Hub Inventory — Needs Rider Assignment ── */}
+            <div style={{ marginBottom: 28 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
                 <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#6366F1" }} />
-                <div style={{ fontSize: 16, fontWeight: 800, color: "#111827" }}>Hub Inventory — {atHub.length} Package{atHub.length !== 1 ? "s" : ""} Ready</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: "#111827" }}>Ready to Dispatch — {atHubUnassigned.length} Package{atHubUnassigned.length !== 1 ? "s" : ""}</div>
               </div>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", background: "#fff", borderRadius: 16, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
                   <thead>
                     <tr style={{ background: "#F9FAFB" }}>
-                      {["Tracking","Description","Customer","Zone","Value","Fees","Flags","Assign Rider"].map(h => (
+                      {["Tracking","Description","Customer","Pickup","Drop-off Zone","Value","Flags","Assign Rider"].map(h => (
                         <th key={h} style={{ padding: "12px 16px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: "1px solid #E5E7EB" }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {atHub.map((pkg, i) => (
-                      <tr key={pkg.id} style={{ borderBottom: i < atHub.length - 1 ? "1px solid #F3F4F6" : "none", background: selectedPkg?.id === pkg.id ? "#FEF2F2" : "#fff" }}>
+                    {atHubUnassigned.map((pkg, i) => (
+                      <tr key={pkg.id} style={{ borderBottom: i < atHubUnassigned.length - 1 ? "1px solid #F3F4F6" : "none", background: selectedPkg?.id === pkg.id ? "#FEF2F2" : "#fff" }}>
                         <td style={{ padding: "12px 16px", fontFamily: "monospace", fontWeight: 700, fontSize: 13, color: "#111827" }}>{pkg.trackingCode}</td>
                         <td style={{ padding: "12px 16px", fontSize: 13, color: "#374151" }}>{pkg.description}</td>
-                        <td style={{ padding: "12px 16px", fontSize: 13, color: "#374151" }}>{pkg.customerName}</td>
-                        <td style={{ padding: "12px 16px" }}>{(() => { const t = TIER_BADGE[getZoneInfo(pkg.deliveryZone).tier]; return <span style={{ background: t.bg, color: t.color, padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 700 }}>{pkg.deliveryZone}</span>; })()}</td>
+                        <td style={{ padding: "12px 16px" }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>{pkg.customerName}</div>
+                        </td>
+                        <td style={{ padding: "12px 16px", fontSize: 12, color: "#6B7280", maxWidth: 140 }}>{pkg.pickupAddress}</td>
+                        <td style={{ padding: "12px 16px" }}>
+                          <div style={{ marginBottom: 4 }}>{(() => { const t = TIER_BADGE[getZoneInfo(pkg.deliveryZone).tier]; return <span style={{ background: t.bg, color: t.color, padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 700 }}>{pkg.deliveryZone}</span>; })()}</div>
+                          <div style={{ fontSize: 11, color: "#9CA3AF" }}>{pkg.deliveryAddress}</div>
+                        </td>
                         <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 700, color: "#111827" }}>KES {pkg.declaredValue.toLocaleString()}</td>
-                        <td style={{ padding: "12px 16px", fontSize: 13, color: "#DC2626", fontWeight: 700 }}>KES {pkg.total}</td>
                         <td style={{ padding: "12px 16px" }}>
                           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                             {pkg.isHighValue && <HighValueBadge />}
-                            {pkg.isHighValue && !pkg.otpWarehouseVerified && (
-                              <span style={{ fontSize: 10, color: "#DC2626", fontWeight: 700 }}>⚠ OTP PENDING</span>
-                            )}
-                            {pkg.protectionFee > 0 && (
-                              <span style={{ fontSize: 10, background: "#FEF3C7", color: "#7F1D1D", padding: "2px 6px", borderRadius: 10, fontWeight: 700 }}>PROTECTED</span>
-                            )}
+                            {pkg.protectionFee > 0 && <span style={{ fontSize: 10, background: "#FEF3C7", color: "#7F1D1D", padding: "2px 6px", borderRadius: 10, fontWeight: 700 }}>PROTECTED</span>}
                           </div>
                         </td>
                         <td style={{ padding: "12px 16px" }}>
-                          {pkg.riderDeliveryId ? (
-                            <div>
-                              <div style={{ fontSize: 12, fontWeight: 700, color: "#10B981" }}>
-                                🏍️ {riders.find(r => r.id === pkg.riderDeliveryId)?.name || "Assigned"}
-                              </div>
-                              <StatusBadge status={pkg.status} />
-                            </div>
-                          ) : selectedPkg?.id === pkg.id ? (
+                          {selectedPkg?.id === pkg.id ? (
                             <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 180 }}>
                               <select value={selectedRider} onChange={e => setSelectedRider(e.target.value)} style={{ padding: "6px 10px", border: "1.5px solid #E5E7EB", borderRadius: 8, fontSize: 13, fontFamily: "inherit" }}>
                                 <option value="">Select Rider...</option>
-                                {riders.filter(r => r.zone === pkg.deliveryZone).map(r => (
-                                  <option key={r.id} value={r.id}>{r.name}</option>
-                                ))}
-                                {riders.filter(r => r.zone === pkg.deliveryZone).length === 0 &&
-                                  riders.map(r => <option key={r.id} value={r.id}>{r.name} ({r.zone})</option>)}
+                                {riders.filter(r => r.zone === pkg.deliveryZone).length > 0
+                                  ? riders.filter(r => r.zone === pkg.deliveryZone).map(r => <option key={r.id} value={r.id}>{r.name} — {r.zone}</option>)
+                                  : riders.map(r => <option key={r.id} value={r.id}>{r.name} ({r.zone})</option>)}
                               </select>
                               <div style={{ display: "flex", gap: 6 }}>
                                 <Btn onClick={() => handleDispatch(pkg)} variant="success" size="sm" disabled={!selectedRider}>🚀 Dispatch</Btn>
-                                <Btn onClick={() => setSelectedPkg(null)} variant="ghost" size="sm">Cancel</Btn>
+                                <Btn onClick={() => { setSelectedPkg(null); setSelectedRider(""); }} variant="ghost" size="sm">Cancel</Btn>
                               </div>
                             </div>
                           ) : (
-                            <Btn onClick={() => setSelectedPkg(pkg)} variant="primary" size="sm">Assign Rider →</Btn>
+                            <Btn onClick={() => { setSelectedPkg(pkg); setSelectedRider(""); }} variant="primary" size="sm">Assign Rider →</Btn>
                           )}
                         </td>
                       </tr>
                     ))}
-                    {atHub.length === 0 && (
-                      <tr><td colSpan={8} style={{ padding: 32, textAlign: "center", color: "#9CA3AF" }}>No packages at hub ready to dispatch</td></tr>
+                    {atHubUnassigned.length === 0 && (
+                      <tr><td colSpan={8} style={{ padding: 32, textAlign: "center", color: "#9CA3AF" }}>All hub packages have been assigned</td></tr>
                     )}
                   </tbody>
                 </table>
               </div>
             </div>
+
+            {/* ── SECTION 3: Dispatched — Awaiting Rider Collection ── */}
+            {atHubDispatched.length > 0 && (
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#0EA5E9" }} />
+                  <div style={{ fontSize: 16, fontWeight: 800, color: "#111827" }}>Dispatched — Awaiting Rider Collection ({atHubDispatched.length})</div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+                  {atHubDispatched.map(pkg => {
+                    const deliveryRider = riders.find(r => r.id === pkg.riderDeliveryId);
+                    return (
+                      <Card key={pkg.id} style={{ border: "1.5px solid #BAE6FD", background: "#F0F9FF" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                          <div style={{ fontFamily: "monospace", fontWeight: 800, fontSize: 13, color: "#111827" }}>{pkg.trackingCode}</div>
+                          <StatusBadge status={pkg.status} />
+                        </div>
+                        <div style={{ fontSize: 13, color: "#374151", marginBottom: 6 }}>{pkg.description}</div>
+                        <div style={{ fontSize: 12, color: "#6B7280" }}>→ {pkg.deliveryAddress}</div>
+                        <div style={{ marginTop: 8, padding: "8px 10px", background: "#fff", borderRadius: 8, fontSize: 12 }}>
+                          <span style={{ color: "#6B7280" }}>Rider: </span>
+                          <span style={{ fontWeight: 700, color: "#0EA5E9" }}>🏍️ {deliveryRider?.name || "—"}</span>
+                          <span style={{ color: "#9CA3AF", marginLeft: 8 }}>({deliveryRider?.phone || ""})</span>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
