@@ -26,8 +26,9 @@ create table packages (
   id uuid primary key default gen_random_uuid(),
   tracking_code text unique not null,
   customer_id uuid references users(id),
-  rider_collection_id uuid references users(id),  -- rider who picked up from customer
-  rider_delivery_id uuid references users(id),    -- rider delivering to final customer
+  rider_collection_id uuid references profiles(id),  -- rider who picked up from customer
+  rider_delivery_id uuid references profiles(id),    -- rider delivering to final customer
+  -- NOTE: rider name/phone/license are NOT stored here; they are joined from the profiles table at query time
   pickup_address text not null,
   delivery_address text not null,
   delivery_zone text not null,
@@ -1851,6 +1852,9 @@ const profileToUser = (authUser, profile) => ({
 });
 
 // Map a Supabase package row (snake_case) to app shape (camelCase)
+// Supports plain rows AND rows joined with profile data via:
+//   collection_rider:profiles!rider_collection_id(name,phone,license_number)
+//   delivery_rider:profiles!rider_delivery_id(name,phone)
 const dbPkgToApp = (p) => ({
   id:                   p.id,
   trackingCode:         p.tracking_code,
@@ -1859,12 +1863,13 @@ const dbPkgToApp = (p) => ({
   recipientName:        p.recipient_name,
   recipientPhone:       p.recipient_phone,
   riderCollectionId:    p.rider_collection_id,
-  riderCollectionName:  p.rider_collection_name,
-  riderCollectionPhone:   p.rider_collection_phone,
-  riderCollectionLicense: p.rider_collection_license,
+  // Prefer joined profile data; fall back to denormalised columns for legacy rows
+  riderCollectionName:    (p.collection_rider && p.collection_rider.name)            || p.rider_collection_name    || null,
+  riderCollectionPhone:   (p.collection_rider && p.collection_rider.phone)           || p.rider_collection_phone   || null,
+  riderCollectionLicense: (p.collection_rider && p.collection_rider.license_number)  || p.rider_collection_license || null,
   riderDeliveryId:      p.rider_delivery_id,
-  riderDeliveryName:    p.rider_delivery_name,
-  riderDeliveryPhone:   p.rider_delivery_phone,
+  riderDeliveryName:    (p.delivery_rider && p.delivery_rider.name)  || p.rider_delivery_name  || null,
+  riderDeliveryPhone:   (p.delivery_rider && p.delivery_rider.phone) || p.rider_delivery_phone || null,
   pickupAddress:        p.pickup_address,
   deliveryAddress:      p.delivery_address,
   deliveryZone:         p.delivery_zone,
@@ -2239,7 +2244,14 @@ export default function App() {
 
   // ── Fetch initial data ──
   const loadPackages = useCallback(async () => {
-    const { data, error } = await supabase.from("packages").select("*").order("created_at", { ascending: false });
+    const { data, error } = await supabase
+      .from("packages")
+      .select(`
+        *,
+        collection_rider:profiles!rider_collection_id ( name, phone, license_number ),
+        delivery_rider:profiles!rider_delivery_id     ( name, phone )
+      `)
+      .order("created_at", { ascending: false });
     if (error) { console.error("[loadPackages] error:", error); return; }
     if (data) {
       console.log("[loadPackages] raw statuses:", data.map(p => ({ id: p.id, status: p.status, ridCol: p.rider_collection_id, ridDel: p.rider_delivery_id })));
