@@ -251,6 +251,7 @@ const RIDERS = [
 const StatusBadge = ({ status }) => {
   const config = {
     searching_rider:          { label: "Searching Rider",      color: "#F59E0B", bg: "#FEF3C7" },
+    awaiting_collection:      { label: "Awaiting Collection",  color: "#0EA5E9", bg: "#E0F2FE" },
     picked_up:                { label: "Collected",            color: "#F87171", bg: "#FEF2F2" },
     pending_warehouse:        { label: "Pending Acceptance",   color: "#8B5CF6", bg: "#EDE9FE" },
     at_warehouse:             { label: "At Warehouse",         color: "#6366F1", bg: "#EEF2FF" },
@@ -420,16 +421,14 @@ function CustomerApp({ packages, onCreatePackage, transitLogs, riders = [] }) {
   };
 
   const TrackingProgress = ({ status }) => {
-    const steps  = ["searching_rider","picked_up","pending_warehouse","at_warehouse","out_for_delivery","pending_delivery","delivered"];
-    const labels = ["Searching","Collected","At Hub","Dispatched","On the Way","Delivered"];
-    const icons  = ["🔍","📦","🏭","🚀","🏍️","✅"];
-    // map status to step index — pending_warehouse and at_warehouse both count as step 2
+    const steps  = ["searching_rider","awaiting_collection","picked_up","pending_warehouse","at_warehouse","out_for_delivery","pending_delivery","delivered"];
+    const icons  = ["🔍","🏍️","📦","🏭","🚀","✅"];
     const statusIdx = steps.indexOf(status);
     const idx = statusIdx === -1 ? 0 : statusIdx;
     return (
       <div style={{ margin: "16px 0" }}>
         <div style={{ display: "flex", alignItems: "flex-start" }}>
-          {["Searching","Collected","At Hub","Dispatched","On the Way","Delivered"].map((label, i) => (
+          {["Searching","Rider Coming","Collected","At Hub","On the Way","Delivered"].map((label, i) => (
             <div key={label} style={{ display: "flex", alignItems: "center", flex: 1 }}>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
                 <div style={{ width: 28, height: 28, borderRadius: "50%", background: i < idx ? "#DC2626" : i === idx ? "#DC2626" : "#E5E7EB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: i < idx ? 12 : 14, color: i <= idx ? "#fff" : "#9CA3AF", fontWeight: 700, flexShrink: 0, boxShadow: i === idx ? "0 0 0 3px rgba(220,38,38,0.2)" : "none", transition: "all 0.3s" }}>
@@ -724,6 +723,7 @@ function CustomerApp({ packages, onCreatePackage, transitLogs, riders = [] }) {
                               <div>
                                 <div style={{ fontSize: 13, fontWeight: 800, color: "#111827" }}>🏍️ {pkg.riderCollectionName}</div>
                                 <div style={{ fontSize: 11, color: "#6B7280", marginTop: 1 }}>Collection rider · {pkg.riderCollectionPhone}</div>
+                                {pkg.riderCollectionLicense && <div style={{ fontSize: 11, color: "#6B7280", marginTop: 1 }}>🪪 Licence: {pkg.riderCollectionLicense}</div>}
                               </div>
                               {pkg.riderCollectionPhone && (
                                 <a href={`tel:${pkg.riderCollectionPhone}`} style={{ background: "#DC2626", color: "#fff", padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700, textDecoration: "none" }}>📞 Call</a>
@@ -762,7 +762,7 @@ function CustomerApp({ packages, onCreatePackage, transitLogs, riders = [] }) {
 // ============================================================
 // RIDER APP
 // ============================================================
-function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onCollectedFromWarehouse, onAcceptDelivery, onVerifyOTP, onMarkDelivered, transitLogs, currentRider, customers = [] }) {
+function RiderApp({ packages, onAcceptCollection, onConfirmCollection, onMarkAtWarehouse, onCollectedFromWarehouse, onAcceptDelivery, onVerifyOTP, onMarkDelivered, transitLogs, currentRider, customers = [] }) {
   const rider = currentRider || RIDERS[0];
   const [feed, setFeed] = useState("collection");
   const [otpInput, setOtpInput] = useState({});
@@ -857,12 +857,15 @@ function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onCollected
 
           {/* ── COLLECTION SIDE ── */}
           {pkg.status === "searching_rider" && !isMyCollection && (
-            <Btn onClick={() => doAction(() => onAcceptCollection(pkg.id, rider.id))} variant="primary" disabled={busy}>{busy ? "Accepting…" : "📦 Accept Collection Job"}</Btn>
+            <Btn onClick={() => doAction(() => onAcceptCollection(pkg.id, rider.id))} variant="primary" disabled={busy}>{busy ? "Accepting…" : "✅ Accept Order"}</Btn>
           )}
-          {pkg.status === "searching_rider" && isMyCollection && (
-            <div style={{ background: "#FEF3C7", border: "1.5px solid #FDE68A", borderRadius: 10, padding: "10px 12px" }}>
-              <div style={{ fontSize: 12, fontWeight: 800, color: "#92400E" }}>✅ Job accepted</div>
-              <div style={{ fontSize: 12, color: "#B45309", marginTop: 2 }}>Go collect the package and bring it to the warehouse.</div>
+          {pkg.status === "awaiting_collection" && isMyCollection && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ background: "#E0F2FE", border: "1.5px solid #BAE6FD", borderRadius: 10, padding: "10px 12px" }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: "#0369A1" }}>🏍️ Heading to sender — collect the package</div>
+                <div style={{ fontSize: 12, color: "#0284C7", marginTop: 2 }}>Once you physically have the package, tap confirm below.</div>
+              </div>
+              <Btn onClick={() => doAction(() => onConfirmCollection(pkg.id))} variant="success" disabled={busy}>{busy ? "Confirming…" : "📦 Confirm Collection"}</Btn>
             </div>
           )}
           {pkg.status === "picked_up" && isMyCollection && (
@@ -1067,7 +1070,7 @@ function AdminDashboard({ packages, riders, customers, transitLogs, onDispatch, 
   const atHub = packages.filter(p => p.status === "at_warehouse");
   const pendingDelivery = packages.filter(p => p.status === "pending_delivery");
   const newRequests = packages.filter(p => p.status === "searching_rider");
-  const inTransit = packages.filter(p => ["searching_rider","picked_up","pending_warehouse","at_warehouse","out_for_delivery","pending_delivery"].includes(p.status));
+  const inTransit = packages.filter(p => ["searching_rider","awaiting_collection","picked_up","pending_warehouse","at_warehouse","out_for_delivery","pending_delivery"].includes(p.status));
   const delivered = packages.filter(p => p.status === "delivered");
   const totalFees = packages.reduce((s, p) => s + p.total, 0);
   const totalValue = inTransit.reduce((s, p) => s + p.declaredValue, 0);
@@ -1741,7 +1744,7 @@ function AdminDashboard({ packages, riders, customers, transitLogs, onDispatch, 
                     const isPendingAccept = pkg.status === "pending_warehouse";
                     const isAtHub = pkg.status === "at_warehouse";
                     const isPendingDelivery = pkg.status === "pending_delivery";
-                    const isInTransit = ["searching_rider","picked_up","pending_warehouse","out_for_delivery","pending_delivery"].includes(pkg.status);
+                    const isInTransit = ["searching_rider","awaiting_collection","picked_up","pending_warehouse","at_warehouse","out_for_delivery","pending_delivery"].includes(pkg.status);
                     const matchLabels = [
                       isPendingAccept && "PENDING ACCEPT",
                       isAtHub && (pkg.riderDeliveryId ? "AT HUB (dispatched)" : "AT HUB (unassigned)"),
@@ -1857,7 +1860,8 @@ const dbPkgToApp = (p) => ({
   recipientPhone:       p.recipient_phone,
   riderCollectionId:    p.rider_collection_id,
   riderCollectionName:  p.rider_collection_name,
-  riderCollectionPhone: p.rider_collection_phone,
+  riderCollectionPhone:   p.rider_collection_phone,
+  riderCollectionLicense: p.rider_collection_license,
   riderDeliveryId:      p.rider_delivery_id,
   riderDeliveryName:    p.rider_delivery_name,
   riderDeliveryPhone:   p.rider_delivery_phone,
@@ -2330,8 +2334,9 @@ export default function App() {
     if (updates.status                !== undefined) dbUpdates.status                     = updates.status;
     if (updates.riderCollectionId     !== undefined) dbUpdates.rider_collection_id         = updates.riderCollectionId;
     if (updates.riderCollectionName   !== undefined) dbUpdates.rider_collection_name       = updates.riderCollectionName;
-    if (updates.riderCollectionPhone  !== undefined) dbUpdates.rider_collection_phone      = updates.riderCollectionPhone;
-    if (updates.riderDeliveryId       !== undefined) dbUpdates.rider_delivery_id           = updates.riderDeliveryId;
+    if (updates.riderCollectionPhone   !== undefined) dbUpdates.rider_collection_phone      = updates.riderCollectionPhone;
+    if (updates.riderCollectionLicense !== undefined) dbUpdates.rider_collection_license    = updates.riderCollectionLicense;
+    if (updates.riderDeliveryId        !== undefined) dbUpdates.rider_delivery_id           = updates.riderDeliveryId;
     if (updates.riderDeliveryName     !== undefined) dbUpdates.rider_delivery_name         = updates.riderDeliveryName;
     if (updates.riderDeliveryPhone    !== undefined) dbUpdates.rider_delivery_phone        = updates.riderDeliveryPhone;
     if (updates.otpWarehouseVerified  !== undefined) dbUpdates.otp_warehouse_verified      = updates.otpWarehouseVerified;
@@ -2382,12 +2387,19 @@ export default function App() {
   const onAcceptCollection = async (pkgId, riderId) => {
     const pkg = packages.find(p => p.id === pkgId);
     await updatePkg(pkgId, {
-      riderCollectionId:    riderId,
-      riderCollectionName:  user.name,
-      riderCollectionPhone: user.phone || "",
-      status:               "picked_up",
+      riderCollectionId:      riderId,
+      riderCollectionName:    user.name,
+      riderCollectionPhone:   user.phone         || "",
+      riderCollectionLicense: user.licenseNumber || "",
+      status:                 "awaiting_collection",
     });
-    await addLog(pkgId, user.id, "rider", user.name, "COLLECTED_FROM_CUSTOMER", pkg?.pickupAddress, "Package collected from customer");
+    await addLog(pkgId, user.id, "rider", user.name, "ACCEPTED_ORDER", pkg?.pickupAddress, `${user.name} accepted — heading to collect`);
+  };
+
+  const onConfirmCollection = async (pkgId) => {
+    const pkg = packages.find(p => p.id === pkgId);
+    await updatePkg(pkgId, { status: "picked_up" });
+    await addLog(pkgId, user.id, "rider", user.name, "COLLECTED_FROM_CUSTOMER", pkg?.pickupAddress, "Package physically collected from sender");
   };
 
   const onMarkAtWarehouse = async (pkgId) => {
@@ -2501,7 +2513,7 @@ export default function App() {
     <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", background: "#F1F5F9", minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
       <TopBar />
       {user.role === "customer" && <CustomerApp packages={packages.filter(p => p.customerId === user.id)} onCreatePackage={onCreatePackage} transitLogs={logs} riders={riders} />}
-      {user.role === "rider"    && <RiderApp packages={packages} onAcceptCollection={onAcceptCollection} onMarkAtWarehouse={onMarkAtWarehouse} onCollectedFromWarehouse={onCollectedFromWarehouse} onAcceptDelivery={onAcceptDelivery} onVerifyOTP={onVerifyOTP} onMarkDelivered={onMarkDelivered} transitLogs={logs} currentRider={user} customers={customers} />}
+      {user.role === "rider"    && <RiderApp packages={packages} onAcceptCollection={onAcceptCollection} onConfirmCollection={onConfirmCollection} onMarkAtWarehouse={onMarkAtWarehouse} onCollectedFromWarehouse={onCollectedFromWarehouse} onAcceptDelivery={onAcceptDelivery} onVerifyOTP={onVerifyOTP} onMarkDelivered={onMarkDelivered} transitLogs={logs} currentRider={user} customers={customers} />}
       {user.role === "admin"    && <AdminDashboard packages={packages} riders={riders} customers={customers} transitLogs={logs} onDispatch={onDispatch} onAcceptAtWarehouse={onAcceptAtWarehouse} onConfirmDelivery={onConfirmDelivery} onAddRider={onAddRider} accounts={[...riders, user]} onRefresh={loadPackages} />}
       <InstallBanner />
     </div>
