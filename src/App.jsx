@@ -26,9 +26,8 @@ create table packages (
   id uuid primary key default gen_random_uuid(),
   tracking_code text unique not null,
   customer_id uuid references users(id),
-  rider_collection_id uuid references profiles(id),  -- rider who picked up from customer
-  rider_delivery_id uuid references profiles(id),    -- rider delivering to final customer
-  -- NOTE: rider name/phone/license are NOT stored here; they are joined from the profiles table at query time
+  rider_collection_id uuid references users(id),  -- rider who picked up from customer
+  rider_delivery_id uuid references users(id),    -- rider delivering to final customer
   pickup_address text not null,
   delivery_address text not null,
   delivery_zone text not null,
@@ -1852,9 +1851,7 @@ const profileToUser = (authUser, profile) => ({
 });
 
 // Map a Supabase package row (snake_case) to app shape (camelCase)
-// Supports plain rows AND rows joined with profile data via:
-//   collection_rider:profiles!rider_collection_id(name,phone,license_number)
-//   delivery_rider:profiles!rider_delivery_id(name,phone)
+// Rider name/phone/license come from joined profiles rows, not stored columns.
 const dbPkgToApp = (p) => ({
   id:                   p.id,
   trackingCode:         p.tracking_code,
@@ -1863,13 +1860,12 @@ const dbPkgToApp = (p) => ({
   recipientName:        p.recipient_name,
   recipientPhone:       p.recipient_phone,
   riderCollectionId:    p.rider_collection_id,
-  // Prefer joined profile data; fall back to denormalised columns for legacy rows
-  riderCollectionName:    (p.collection_rider && p.collection_rider.name)            || p.rider_collection_name    || null,
-  riderCollectionPhone:   (p.collection_rider && p.collection_rider.phone)           || p.rider_collection_phone   || null,
-  riderCollectionLicense: (p.collection_rider && p.collection_rider.license_number)  || p.rider_collection_license || null,
+  riderCollectionName:    (p.collection_rider && p.collection_rider.name)           || null,
+  riderCollectionPhone:   (p.collection_rider && p.collection_rider.phone)          || null,
+  riderCollectionLicense: (p.collection_rider && p.collection_rider.license_number) || null,
   riderDeliveryId:      p.rider_delivery_id,
-  riderDeliveryName:    (p.delivery_rider && p.delivery_rider.name)  || p.rider_delivery_name  || null,
-  riderDeliveryPhone:   (p.delivery_rider && p.delivery_rider.phone) || p.rider_delivery_phone || null,
+  riderDeliveryName:    (p.delivery_rider && p.delivery_rider.name)  || null,
+  riderDeliveryPhone:   (p.delivery_rider && p.delivery_rider.phone) || null,
   pickupAddress:        p.pickup_address,
   deliveryAddress:      p.delivery_address,
   deliveryZone:         p.delivery_zone,
@@ -2244,13 +2240,10 @@ export default function App() {
 
   // ── Fetch initial data ──
   const loadPackages = useCallback(async () => {
+    const selectQuery = "*,collection_rider:profiles!rider_collection_id(name,phone,license_number),delivery_rider:profiles!rider_delivery_id(name,phone)";
     const { data, error } = await supabase
       .from("packages")
-      .select(`
-        *,
-        collection_rider:profiles!rider_collection_id ( name, phone, license_number ),
-        delivery_rider:profiles!rider_delivery_id     ( name, phone )
-      `)
+      .select(selectQuery)
       .order("created_at", { ascending: false });
     if (error) { console.error("[loadPackages] error:", error); return; }
     if (data) {
@@ -2344,13 +2337,9 @@ export default function App() {
     // 2. Write to Supabase
     const dbUpdates = {};
     if (updates.status                !== undefined) dbUpdates.status                     = updates.status;
-    if (updates.riderCollectionId     !== undefined) dbUpdates.rider_collection_id         = updates.riderCollectionId;
-    if (updates.riderCollectionName   !== undefined) dbUpdates.rider_collection_name       = updates.riderCollectionName;
-    if (updates.riderCollectionPhone   !== undefined) dbUpdates.rider_collection_phone      = updates.riderCollectionPhone;
-    if (updates.riderCollectionLicense !== undefined) dbUpdates.rider_collection_license    = updates.riderCollectionLicense;
-    if (updates.riderDeliveryId        !== undefined) dbUpdates.rider_delivery_id           = updates.riderDeliveryId;
-    if (updates.riderDeliveryName     !== undefined) dbUpdates.rider_delivery_name         = updates.riderDeliveryName;
-    if (updates.riderDeliveryPhone    !== undefined) dbUpdates.rider_delivery_phone        = updates.riderDeliveryPhone;
+    // Only write the FK IDs — name/phone/license are not stored in packages; they come from profiles via join
+    if (updates.riderCollectionId     !== undefined) dbUpdates.rider_collection_id = updates.riderCollectionId;
+    if (updates.riderDeliveryId       !== undefined) dbUpdates.rider_delivery_id   = updates.riderDeliveryId;
     if (updates.otpWarehouseVerified  !== undefined) dbUpdates.otp_warehouse_verified      = updates.otpWarehouseVerified;
     if (updates.otpDeliveryVerified   !== undefined) dbUpdates.otp_delivery_verified       = updates.otpDeliveryVerified;
 
@@ -2399,11 +2388,8 @@ export default function App() {
   const onAcceptCollection = async (pkgId, riderId) => {
     const pkg = packages.find(p => p.id === pkgId);
     await updatePkg(pkgId, {
-      riderCollectionId:      riderId,
-      riderCollectionName:    user.name,
-      riderCollectionPhone:   user.phone         || "",
-      riderCollectionLicense: user.licenseNumber || "",
-      status:                 "awaiting_collection",
+      riderCollectionId: riderId,
+      status:            "awaiting_collection",
     });
     await addLog(pkgId, user.id, "rider", user.name, "ACCEPTED_ORDER", pkg?.pickupAddress, `${user.name} accepted — heading to collect`);
   };
