@@ -408,20 +408,20 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
 
   const TrackingProgress = ({ status }) => {
     const steps  = ["searching_rider","rider_accepted_collection","picked_up","at_warehouse","out_for_delivery","delivered"];
-    const labels = ["Searching","Rider Accepted","Collected","At Hub","On the Way","Delivered"];
+    const labels = ["Searching","Accepted","Collected","At Hub","En Route","Delivered"];
     const idx    = steps.indexOf(status);
     return (
-      <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch", margin: "16px 0" }}>
-        <div style={{ display: "flex", alignItems: "center", minWidth: 380 }}>
+      <div style={{ margin: "14px 0" }}>
+        <div style={{ display: "flex", alignItems: "flex-start" }}>
           {steps.map((s, i) => (
-            <div key={s} style={{ display: "flex", alignItems: "center", flex: 1 }}>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
-                <div style={{ width: 24, height: 24, borderRadius: "50%", background: i <= idx ? "#DC2626" : "#E5E7EB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: i <= idx ? "#fff" : "#9CA3AF", fontWeight: 700, flexShrink: 0 }}>
+            <div key={s} style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1, minWidth: 0 }}>
+                <div style={{ width: 20, height: 20, borderRadius: "50%", background: i <= idx ? "#DC2626" : "#E5E7EB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: i <= idx ? "#fff" : "#9CA3AF", fontWeight: 700, flexShrink: 0 }}>
                   {i < idx ? "✓" : i + 1}
                 </div>
-                <div style={{ fontSize: 9, textAlign: "center", color: i <= idx ? "#DC2626" : "#9CA3AF", fontWeight: i === idx ? 800 : 500, marginTop: 4, lineHeight: 1.2, width: 48 }}>{labels[i]}</div>
+                <div style={{ fontSize: 8, textAlign: "center", color: i <= idx ? "#DC2626" : "#9CA3AF", fontWeight: i === idx ? 800 : 500, marginTop: 3, lineHeight: 1.2, maxWidth: "100%", wordBreak: "break-word" }}>{labels[i]}</div>
               </div>
-              {i < steps.length - 1 && <div style={{ height: 2, flex: 1, background: i < idx ? "#DC2626" : "#E5E7EB", margin: "0 2px", marginBottom: 20, flexShrink: 0 }} />}
+              {i < steps.length - 1 && <div style={{ height: 2, flex: 1, background: i < idx ? "#DC2626" : "#E5E7EB", margin: "0 1px", marginBottom: 18, flexShrink: 0 }} />}
             </div>
           ))}
         </div>
@@ -554,7 +554,7 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
 
   // ── Main view ───────────────────────────────────────────────
   return (
-    <div style={{ maxWidth: 480, margin: "0 auto", fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+    <div style={{ maxWidth: 480, margin: "0 auto", fontFamily: "'DM Sans', system-ui, sans-serif", width: "100%" }}>
       {/* Header */}
       <div style={{ background: "#fff", padding: "20px 20px 0", borderRadius: "0 0 24px 24px", borderBottom: "2px solid #FECACA", boxShadow: "0 2px 16px rgba(220,38,38,0.08)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
