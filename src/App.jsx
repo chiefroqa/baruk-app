@@ -332,7 +332,7 @@ const EVENT_META = {
   ORDER_PLACED:              { icon: "📋", color: "#6B7280", label: "Order Placed" },
   PICKUP_REQUESTED:          { icon: "🛵", color: "#7C3AED", label: "Pickup Requested" },
   RIDER_ACCEPTED_COLLECTION: { icon: "🏍️", color: "#F97316", label: "Rider Accepted — On the Way" },
-  COLLECTED_FROM_CUSTOMER:   { icon: "📦", color: "#F59E0B", label: "Collected from Customer" },
+  COLLECTED_FROM_CUSTOMER:   { icon: "📦", color: "#F59E0B", label: "Package Collected" },
   ARRIVED_AT_WAREHOUSE:      { icon: "🏭", color: "#8B5CF6", label: "Arrived at Warehouse" },
   WAREHOUSE_ACCEPTED:        { icon: "✅", color: "#10B981", label: "Accepted at Warehouse" },
   DISPATCHED_TO_RIDER:       { icon: "🚀", color: "#DC2626", label: "Dispatched to Rider" },
@@ -430,8 +430,8 @@ function CustomerApp({ packages, onCreatePackage, transitLogs, riders = [] }) {
     const statusIdx = steps.indexOf(status);
     const idx = statusIdx === -1 ? 0 : statusIdx;
     return (
-      <div style={{ margin: "16px 0" }}>
-        <div style={{ display: "flex", alignItems: "flex-start" }}>
+      <div style={{ margin: "16px 0", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", minWidth: 480 }}>
           {labels.map((label, i) => (
             <div key={label} style={{ display: "flex", alignItems: "center", flex: 1 }}>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
@@ -686,7 +686,7 @@ function CustomerApp({ packages, onCreatePackage, transitLogs, riders = [] }) {
               const hasCollectionRider = pkg.riderCollectionId;
               const hasDeliveryRider   = pkg.riderDeliveryId;
               return (
-                <div key={pkg.id} style={{ background: "#fff", borderRadius: 16, marginBottom: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.07), 0 4px 20px rgba(0,0,0,0.04)", overflow: "hidden" }}>
+                <div key={pkg.id} style={{ background: "#fff", borderRadius: 16, marginBottom: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.07), 0 4px 20px rgba(0,0,0,0.04)" }}>
                   {/* ── Tappable header — always visible ── */}
                   <div
                     onClick={() => setExpandedPkg(isExpanded ? null : pkg.id)}
