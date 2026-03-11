@@ -325,7 +325,31 @@ const Stat = ({ label, value, sub, color = "#DC2626" }) => (
   </div>
 );
 
-const Timeline = ({ logs }) => (
+const EVENT_LABELS = {
+  ORDER_PLACED:              "Order Placed",
+  PICKUP_REQUESTED:          "Pickup Requested",
+  RIDER_ACCEPTED_COLLECTION: "Rider Accepted — On the Way",
+  PACKAGE_COLLECTED:         "Collected",
+  COLLECTED_FROM_CUSTOMER:   "Collected",
+  ARRIVED_AT_WAREHOUSE:      "Arrived at Hub",
+  WAREHOUSE_ACCEPTED:        "Accepted at Hub",
+  DISPATCHED_TO_RIDER:       "Dispatched to Rider",
+  ACCEPTED_DELIVERY_JOB:     "Rider Accepted Delivery",
+  OUT_FOR_DELIVERY:          "Out for Delivery",
+  OTP_WAREHOUSE_VERIFIED:    "OTP Verified (Hub)",
+  OTP_DELIVERY_VERIFIED:     "OTP Verified (Delivery)",
+  DELIVERED:                 "Delivered",
+};
+
+const Timeline = ({ logs }) => {
+  const getLabel = (event) => {
+    if (!event) return "Unknown";
+    // Try exact match first, then uppercase, then title-case fallback
+    return EVENT_LABELS[event]
+      || EVENT_LABELS[event.toUpperCase()]
+      || event.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+  };
+  return (
   <div style={{ position: "relative" }}>
     {logs.map((log, i) => (
       <div key={log.id} style={{ display: "flex", gap: 12, marginBottom: i < logs.length - 1 ? 16 : 0 }}>
@@ -334,7 +358,7 @@ const Timeline = ({ logs }) => (
           {i < logs.length - 1 && <div style={{ width: 2, flex: 1, background: "#E5E7EB", marginTop: 4 }} />}
         </div>
         <div style={{ paddingBottom: i < logs.length - 1 ? 16 : 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>{log.event.replace(/_/g, " ")}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>{getLabel(log.event)}</div>
           <div style={{ fontSize: 12, color: "#6B7280" }}>{log.actorName} • {log.location}</div>
           <div style={{ fontSize: 11, color: "#9CA3AF" }}>{new Date(log.createdAt).toLocaleString()}</div>
           {log.notes && <div style={{ fontSize: 12, color: "#DC2626", marginTop: 2, fontStyle: "italic" }}>"{log.notes}"</div>}
@@ -342,7 +366,8 @@ const Timeline = ({ logs }) => (
       </div>
     ))}
   </div>
-);
+  );
+};
 
 // ============================================================
 // CUSTOMER APP
@@ -734,9 +759,9 @@ function RiderApp({ packages, onAcceptCollection, onConfirmCollected, onMarkAtWa
   const [otpInput, setOtpInput] = useState({});
   const [otpError, setOtpError] = useState({});
 
-  const collectionFeed = packages.filter(p => p.status === "searching_rider" && p.deliveryZone !== rider.zone);
+  const collectionFeed = packages.filter(p => p.status === "searching_rider" && !p.riderCollectionId);
   const myActive = packages.filter(p => p.riderCollectionId === rider.id || p.riderDeliveryId === rider.id);
-  const deliveryFeed = packages.filter(p => p.status === "at_warehouse" && p.deliveryZone === rider.zone && !p.riderDeliveryId);
+  const deliveryFeed = packages.filter(p => p.riderDeliveryId === rider.id && p.status === "at_warehouse");
 
   const handleOTPVerify = (pkg, type) => {
     const entered = otpInput[`${pkg.id}-${type}`] || "";
@@ -806,8 +831,11 @@ function RiderApp({ packages, onAcceptCollection, onConfirmCollected, onMarkAtWa
               {otpError[`${pkg.id}-warehouse`] && <div style={{ color: "#EF4444", fontSize: 12, marginTop: 6 }}>❌ Incorrect OTP. Try again.</div>}
             </div>
           )}
-          {pkg.status === "at_warehouse" && !isMyDelivery && pkg.deliveryZone === rider.zone && (
-            <Btn onClick={() => onAcceptDelivery(pkg.id, rider.id)} variant="primary">Accept Delivery</Btn>
+          {pkg.status === "at_warehouse" && isMyDelivery && (
+            <div style={{ background: "#EEF2FF", border: "1.5px solid #C7D2FE", borderRadius: 10, padding: "10px 12px" }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#3730A3", marginBottom: 8 }}>📦 Package dispatched to you — collect from hub</div>
+              <Btn onClick={() => onAcceptDelivery(pkg.id, rider.id)} variant="primary" style={{ width: "100%" }}>✅ Accept &amp; Collected from Hub</Btn>
+            </div>
           )}
           {needsDeliveryOTP && (
             <div style={{ background: "#FEF2F2", border: "1.5px solid #FCA5A5", borderRadius: 10, padding: 12 }}>
@@ -987,7 +1015,9 @@ function AdminDashboard({ packages, riders, transitLogs, onDispatch, onAddRider,
                         </div>
                       </td>
                       <td style={{ padding: "12px 16px" }}>
-                        {selectedPkg?.id === pkg.id ? (
+                        {pkg.riderDeliveryId ? (
+                          <span style={{ fontSize: 12, fontWeight: 700, color: "#10B981", background: "#ECFDF5", padding: "4px 10px", borderRadius: 20 }}>✓ Dispatched</span>
+                        ) : selectedPkg?.id === pkg.id ? (
                           <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 180 }}>
                             <select value={selectedRider} onChange={e => setSelectedRider(e.target.value)} style={{ padding: "6px 10px", border: "1.5px solid #E5E7EB", borderRadius: 8, fontSize: 13, fontFamily: "inherit" }}>
                               <option value="">Select Rider...</option>
@@ -1130,7 +1160,7 @@ function AdminDashboard({ packages, riders, transitLogs, onDispatch, onAddRider,
                       <tr key={log.id} style={{ borderBottom: "1px solid #F3F4F6" }}>
                         <td style={{ padding: "10px 12px", fontFamily: "monospace", fontSize: 12, fontWeight: 700, color: "#DC2626" }}>{pkg?.trackingCode || log.packageId.slice(0,8)}</td>
                         <td style={{ padding: "10px 12px" }}>
-                          <span style={{ background: "#F0FDF4", color: "#166534", padding: "2px 8px", borderRadius: 6, fontSize: 12, fontWeight: 700 }}>{log.event.replace(/_/g, " ")}</span>
+                          <span style={{ background: "#F0FDF4", color: "#166534", padding: "2px 8px", borderRadius: 6, fontSize: 12, fontWeight: 700 }}>{EVENT_LABELS[log.event] || EVENT_LABELS[log.event?.toUpperCase()] || log.event?.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}</span>
                         </td>
                         <td style={{ padding: "10px 12px", fontSize: 13, color: "#374151" }}>{log.actorName} <span style={{ fontSize: 11, color: "#9CA3AF" }}>({log.actorRole})</span></td>
                         <td style={{ padding: "10px 12px", fontSize: 12, color: "#6B7280" }}>{log.location}</td>
@@ -1217,6 +1247,11 @@ const dbPkgToApp = (p) => ({
   customerName:         p.customer_name,
   riderCollectionId:    p.rider_collection_id,
   riderDeliveryId:      p.rider_delivery_id,
+  riderCollectionName:  p.collection_rider?.name  || null,
+  riderCollectionPhone: p.collection_rider?.phone || null,
+  riderCollectionLicense: p.collection_rider?.license_number || null,
+  riderDeliveryName:    p.delivery_rider?.name    || null,
+  riderDeliveryPhone:   p.delivery_rider?.phone   || null,
   pickupAddress:        p.pickup_address,
   deliveryAddress:      p.delivery_address,
   deliveryZone:         p.delivery_zone,
@@ -1584,7 +1619,8 @@ export default function App() {
 
   // ── Fetch initial data ──
   const loadPackages = useCallback(async () => {
-    const { data } = await supabase.from("packages").select("*").order("created_at", { ascending: false });
+    const selectQuery = "*,collection_rider:profiles!rider_collection_id(name,phone,license_number),delivery_rider:profiles!rider_delivery_id(name,phone)";
+    const { data } = await supabase.from("packages").select(selectQuery).order("created_at", { ascending: false });
     if (data) setPackages(data.map(dbPkgToApp));
   }, []);
 
@@ -1648,6 +1684,8 @@ export default function App() {
 
   // ── Update package in DB ──
   const updatePkg = async (id, updates) => {
+    // Optimistic local update — instant UI response
+    setPackages(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
     // Convert camelCase app fields back to snake_case for DB
     const dbUpdates = {};
     if (updates.status               !== undefined) dbUpdates.status                    = updates.status;
@@ -1655,8 +1693,9 @@ export default function App() {
     if (updates.riderDeliveryId      !== undefined) dbUpdates.rider_delivery_id          = updates.riderDeliveryId;
     if (updates.otpWarehouseVerified !== undefined) dbUpdates.otp_warehouse_verified     = updates.otpWarehouseVerified;
     if (updates.otpDeliveryVerified  !== undefined) dbUpdates.otp_delivery_verified      = updates.otpDeliveryVerified;
-    await supabase.from("packages").update(dbUpdates).eq("id", id);
-    // Realtime will trigger loadPackages() automatically
+    const { error } = await supabase.from("packages").update(dbUpdates).eq("id", id);
+    // On error, re-sync from DB to recover correct state
+    if (error) loadPackages();
   };
 
   // ── Create new package ──
@@ -1712,14 +1751,13 @@ export default function App() {
 
   const onDispatch = async (pkgId, riderId) => {
     const rider = riders.find(r => r.id === riderId);
-    await updatePkg(pkgId, { riderDeliveryId: riderId, status: "out_for_delivery" });
+    await updatePkg(pkgId, { riderDeliveryId: riderId, status: "at_warehouse" });
     await addLog(pkgId, user.id, "admin", user.name, "DISPATCHED_TO_RIDER", "Baruk Central, CBD", `Assigned to ${rider?.name}`);
-    await addLog(pkgId, riderId, "rider", rider?.name, "OUT_FOR_DELIVERY", "Baruk Central, CBD");
   };
 
   const onAcceptDelivery = async (pkgId, riderId) => {
-    await updatePkg(pkgId, { riderDeliveryId: riderId });
-    await addLog(pkgId, riderId, "rider", user.name, "ACCEPTED_DELIVERY_JOB", "Baruk Central, CBD");
+    await updatePkg(pkgId, { status: "out_for_delivery" });
+    await addLog(pkgId, riderId, "rider", user.name, "ACCEPTED_DELIVERY_JOB", "Baruk Central, CBD", "Rider collected from hub — heading to customer");
   };
 
   const onVerifyOTP = async (pkgId, type) => {
