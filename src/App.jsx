@@ -409,22 +409,60 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
   };
 
   const TrackingProgress = ({ status }) => {
-    const steps  = ["searching_rider","awaiting_collection","picked_up","pending_warehouse","at_warehouse","out_for_delivery","pending_delivery","delivered"];
-    const labels = ["Searching","En Route","Picked Up","At Hub","Accepted","Out","Confirming","Delivered"];
-    const idx    = steps.indexOf(status);
+    const steps = [
+      { key: "searching_rider",    label: "Searching for Rider",       icon: "🔍" },
+      { key: "awaiting_collection",label: "Rider En Route to Collect", icon: "🏍️" },
+      { key: "picked_up",          label: "Package Picked Up",         icon: "📦" },
+      { key: "pending_warehouse",  label: "Arriving at Hub",           icon: "🏭" },
+      { key: "at_warehouse",       label: "At Hub — Being Dispatched", icon: "✅" },
+      { key: "out_for_delivery",   label: "Out for Delivery",          icon: "🚀" },
+      { key: "pending_delivery",   label: "Delivered — Confirming",    icon: "📬" },
+      { key: "delivered",          label: "Delivered",                 icon: "🎉" },
+    ];
+    const idx = steps.findIndex(s => s.key === status);
     return (
-      <div style={{ display: "flex", alignItems: "center", margin: "16px 0" }}>
-        {steps.map((s, i) => (
-          <div key={s} style={{ display: "flex", alignItems: "center", flex: 1 }}>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
-              <div style={{ width: 24, height: 24, borderRadius: "50%", background: i <= idx ? "#DC2626" : "#E5E7EB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: i <= idx ? "#fff" : "#9CA3AF", fontWeight: 700, flexShrink: 0 }}>
-                {i < idx ? "✓" : i + 1}
+      <div style={{ margin: "16px 0" }}>
+        {steps.map((s, i) => {
+          const done    = i < idx;
+          const current = i === idx;
+          const pending = i > idx;
+          return (
+            <div key={s.key} style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: i < steps.length - 1 ? 0 : 0 }}>
+              {/* Left: dot + line */}
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0, width: 28 }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: "50%",
+                  background: done ? "#DC2626" : current ? "#DC2626" : "#E5E7EB",
+                  border: current ? "3px solid #FECACA" : "none",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: done ? 13 : 11,
+                  color: done || current ? "#fff" : "#9CA3AF",
+                  fontWeight: 700, flexShrink: 0,
+                  boxShadow: current ? "0 0 0 4px rgba(220,38,38,0.15)" : "none",
+                }}>
+                  {done ? "✓" : current ? s.icon : i + 1}
+                </div>
+                {i < steps.length - 1 && (
+                  <div style={{ width: 2, height: 28, background: done ? "#DC2626" : "#E5E7EB", marginTop: 2 }} />
+                )}
               </div>
-              <div style={{ fontSize: 9, textAlign: "center", color: i <= idx ? "#DC2626" : "#9CA3AF", fontWeight: i === idx ? 800 : 500, marginTop: 4, lineHeight: 1.2, width: 52 }}>{labels[i]}</div>
+              {/* Right: label */}
+              <div style={{ paddingBottom: i < steps.length - 1 ? 16 : 0, paddingTop: 4 }}>
+                <div style={{
+                  fontSize: 13,
+                  fontWeight: current ? 800 : done ? 600 : 500,
+                  color: current ? "#DC2626" : done ? "#374151" : "#9CA3AF",
+                  lineHeight: 1.3,
+                }}>
+                  {s.label}
+                </div>
+                {current && (
+                  <div style={{ fontSize: 11, color: "#EF4444", fontWeight: 600, marginTop: 2 }}>● Current status</div>
+                )}
+              </div>
             </div>
-            {i < steps.length - 1 && <div style={{ height: 2, flex: 1, background: i < idx ? "#DC2626" : "#E5E7EB", margin: "0 2px", marginBottom: 20, flexShrink: 0 }} />}
-          </div>
-        ))}
+          );
+        })}
       </div>
     );
   };
