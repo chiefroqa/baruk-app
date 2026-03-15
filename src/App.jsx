@@ -685,34 +685,125 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
                 <Btn onClick={() => setView("new")} style={{ marginTop: 16 }} variant="primary">Book a Delivery</Btn>
               </Card>
             )}
-            {packages.map(pkg => (
-              <Card key={pkg.id} style={{ marginBottom: 12, cursor: "pointer" }} onClick={() => setExpandedPkg(expandedPkg === pkg.id ? null : pkg.id)}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#111827", fontFamily: "monospace" }}>{pkg.trackingCode}</div>
-                    <div style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>{pkg.description}</div>
+            {packages.map(pkg => {
+              const isExpanded         = expandedPkg === pkg.id;
+              const hasCollectionRider = pkg.riderCollectionId;
+              const hasDeliveryRider   = pkg.riderDeliveryId;
+              return (
+                <div key={pkg.id} style={{ background: "#fff", borderRadius: 16, marginBottom: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.07), 0 4px 20px rgba(0,0,0,0.04)", overflow: "hidden" }}>
+
+                  {/* ── Tappable header — always visible ── */}
+                  <div onClick={() => setExpandedPkg(isExpanded ? null : pkg.id)} style={{ padding: 20, cursor: "pointer", userSelect: "none" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "#111827", fontFamily: "monospace" }}>{pkg.trackingCode}</div>
+                        <div style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>{pkg.description}</div>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                        <StatusBadge status={pkg.status} />
+                        {pkg.requestType === "pickup_request" && <div style={{ fontSize: 10, fontWeight: 700, color: "#7C3AED", background: "#EDE9FE", padding: "2px 8px", borderRadius: 20 }}>🛵 Pickup Req.</div>}
+                        {pkg.isHighValue && <HighValueBadge />}
+                      </div>
+                    </div>
+
+                    {pkg.requestType === "pickup_request" && pkg.collectFromName && (
+                      <div style={{ fontSize: 12, color: "#7C3AED", fontWeight: 600, marginBottom: 4 }}>🏪 {pkg.collectFromName}</div>
+                    )}
+                    <div style={{ fontSize: 12, color: "#9CA3AF" }}>→ {pkg.deliveryAddress}</div>
+
+                    {/* Rider preview pill — visible even when collapsed */}
+                    {hasCollectionRider && pkg.status !== "searching_rider" && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, background: "#FEF2F2", borderRadius: 8, padding: "5px 10px" }}>
+                        <span style={{ fontSize: 13 }}>🏍️</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: "#DC2626" }}>
+                          {pkg.riderCollectionName || "Rider assigned"}
+                        </span>
+                        {pkg.riderCollectionPhone && (
+                          <a
+                            href={"tel:" + pkg.riderCollectionPhone}
+                            onClick={e => e.stopPropagation()}
+                            style={{ marginLeft: "auto", background: "#DC2626", color: "#fff", padding: "3px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700, textDecoration: "none" }}
+                          >📞 Call</a>
+                        )}
+                      </div>
+                    )}
+
+                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, alignItems: "center" }}>
+                      <span style={{ fontSize: 12, color: "#6B7280" }}>KES {pkg.total}</span>
+                      <span style={{ fontSize: 12, color: "#DC2626", fontWeight: 700 }}>{isExpanded ? "▲ Less" : "▼ Details"}</span>
+                    </div>
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-                    <StatusBadge status={pkg.status} />
-                    {pkg.requestType === "pickup_request" && <div style={{ fontSize: 10, fontWeight: 700, color: "#7C3AED", background: "#EDE9FE", padding: "2px 8px", borderRadius: 20 }}>🛵 Pickup Req.</div>}
-                    {pkg.isHighValue && <HighValueBadge />}
-                  </div>
+
+                  {/* ── Expanded detail panel ── */}
+                  {isExpanded && (
+                    <div style={{ padding: "0 20px 20px", borderTop: "1px solid #F3F4F6" }}>
+                      <div style={{ paddingTop: 14 }}>
+                        <TrackingProgress status={pkg.status} />
+
+                        {/* Recipient details */}
+                        {(pkg.recipientName || pkg.recipientPhone) && (
+                          <div style={{ marginBottom: 14 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Delivering To</div>
+                            <div style={{ background: "#F0F9FF", border: "1px solid #BAE6FD", borderRadius: 10, padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <div>
+                                <div style={{ fontSize: 13, fontWeight: 800, color: "#111827" }}>{pkg.recipientName}</div>
+                                <div style={{ fontSize: 12, color: "#6B7280", marginTop: 1 }}>{pkg.recipientPhone}</div>
+                              </div>
+                              {pkg.recipientPhone && (
+                                <a href={"tel:" + pkg.recipientPhone} style={{ background: "#0EA5E9", color: "#fff", padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700, textDecoration: "none" }}>📞 Call</a>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Rider details */}
+                        {(hasCollectionRider || hasDeliveryRider) && pkg.status !== "searching_rider" && (
+                          <div style={{ marginBottom: 14 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Your Rider</div>
+
+                            {hasCollectionRider && (
+                              <div style={{ background: "#FEF2F2", border: "1.5px solid #FECACA", borderRadius: 10, padding: "12px 14px", marginBottom: 8 }}>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: "#DC2626", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+                                  {pkg.status === "out_for_delivery" || pkg.status === "pending_delivery" || pkg.status === "delivered" ? "Collection Rider" : "Coming to Collect"}
+                                </div>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                  <div>
+                                    <div style={{ fontSize: 14, fontWeight: 800, color: "#111827" }}>🏍️ {pkg.riderCollectionName || "Rider assigned"}</div>
+                                    {pkg.riderCollectionPhone && <div style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>{pkg.riderCollectionPhone}</div>}
+                                    {pkg.riderCollectionLicense && <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 1 }}>🪪 {pkg.riderCollectionLicense}</div>}
+                                  </div>
+                                  {pkg.riderCollectionPhone && (
+                                    <a href={"tel:" + pkg.riderCollectionPhone} style={{ background: "#DC2626", color: "#fff", padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 700, textDecoration: "none" }}>📞 Call</a>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            {hasDeliveryRider && (
+                              <div style={{ background: "#F0FDF4", border: "1.5px solid #6EE7B7", borderRadius: 10, padding: "12px 14px" }}>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: "#065F46", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Delivery Rider</div>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                  <div>
+                                    <div style={{ fontSize: 14, fontWeight: 800, color: "#111827" }}>🏍️ {pkg.riderDeliveryName || "Rider assigned"}</div>
+                                    {pkg.riderDeliveryPhone && <div style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>{pkg.riderDeliveryPhone}</div>}
+                                  </div>
+                                  {pkg.riderDeliveryPhone && (
+                                    <a href={"tel:" + pkg.riderDeliveryPhone} style={{ background: "#10B981", color: "#fff", padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 700, textDecoration: "none" }}>📞 Call</a>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 10 }}>Chain of Custody</div>
+                        <Timeline logs={transitLogs.filter(l => l.packageId === pkg.id)} />
+                      </div>
+                    </div>
+                  )}
                 </div>
-                {pkg.requestType === "pickup_request" && pkg.collectFromName && <div style={{ fontSize: 12, color: "#7C3AED", fontWeight: 600, marginBottom: 2 }}>🏪 {pkg.collectFromName}</div>}
-                <div style={{ fontSize: 12, color: "#9CA3AF" }}>→ {pkg.deliveryAddress}</div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, alignItems: "center" }}>
-                  <span style={{ fontSize: 12, color: "#6B7280" }}>KES {pkg.total}</span>
-                  <span style={{ fontSize: 12, color: "#DC2626", fontWeight: 700 }}>{expandedPkg === pkg.id ? "▲ Less" : "▼ Details"}</span>
-                </div>
-                {expandedPkg === pkg.id && (
-                  <div style={{ marginTop: 14, borderTop: "1px solid #F3F4F6", paddingTop: 14 }}>
-                    <TrackingProgress status={pkg.status} />
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 10 }}>Chain of Custody</div>
-                    <Timeline logs={transitLogs.filter(l => l.packageId === pkg.id)} />
-                  </div>
-                )}
-              </Card>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
