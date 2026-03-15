@@ -1816,12 +1816,12 @@ const dbPkgToApp = (p) => ({
   recipientName:          p.recipient_name,
   recipientPhone:         p.recipient_phone,
   riderCollectionId:      p.rider_collection_id,
-  riderCollectionName:    (p.collection_rider && p.collection_rider.name)           || null,
-  riderCollectionPhone:   (p.collection_rider && p.collection_rider.phone)          || null,
-  riderCollectionLicense: (p.collection_rider && p.collection_rider.license_number) || null,
+  riderCollectionName:    p.rider_collection_name    || null,
+  riderCollectionPhone:   p.rider_collection_phone   || null,
+  riderCollectionLicense: p.rider_collection_license || null,
   riderDeliveryId:        p.rider_delivery_id,
-  riderDeliveryName:      (p.delivery_rider && p.delivery_rider.name)  || null,
-  riderDeliveryPhone:     (p.delivery_rider && p.delivery_rider.phone) || null,
+  riderDeliveryName:      p.rider_delivery_name      || null,
+  riderDeliveryPhone:     p.rider_delivery_phone     || null,
   pickupAddress:          p.pickup_address,
   deliveryAddress:        p.delivery_address,
   deliveryZone:           p.delivery_zone,
@@ -2189,8 +2189,7 @@ export default function App() {
 
   // ── Fetch initial data ──
   const loadPackages = useCallback(async () => {
-    const selectQuery = "*,collection_rider:profiles!rider_collection_id(name,phone,license_number),delivery_rider:profiles!rider_delivery_id(name,phone)";
-    const { data, error } = await supabase.from("packages").select(selectQuery).order("created_at", { ascending: false });
+    const { data, error } = await supabase.from("packages").select("*").order("created_at", { ascending: false });
     if (error) { console.error("[loadPackages] error:", error); return; }
     if (data) {
       console.log("[loadPackages] raw statuses:", data.map(p => ({ id: p.id, status: p.status, ridCol: p.rider_collection_id, ridDel: p.rider_delivery_id })));
@@ -2270,11 +2269,16 @@ export default function App() {
 
     // 2. Write to Supabase
     const dbUpdates = {};
-    if (updates.status               !== undefined) dbUpdates.status                    = updates.status;
-    if (updates.riderCollectionId    !== undefined) dbUpdates.rider_collection_id        = updates.riderCollectionId;
-    if (updates.riderDeliveryId      !== undefined) dbUpdates.rider_delivery_id          = updates.riderDeliveryId;
-    if (updates.otpWarehouseVerified !== undefined) dbUpdates.otp_warehouse_verified     = updates.otpWarehouseVerified;
-    if (updates.otpDeliveryVerified  !== undefined) dbUpdates.otp_delivery_verified      = updates.otpDeliveryVerified;
+    if (updates.status                 !== undefined) dbUpdates.status                    = updates.status;
+    if (updates.riderCollectionId      !== undefined) dbUpdates.rider_collection_id       = updates.riderCollectionId;
+    if (updates.riderCollectionName    !== undefined) dbUpdates.rider_collection_name     = updates.riderCollectionName;
+    if (updates.riderCollectionPhone   !== undefined) dbUpdates.rider_collection_phone    = updates.riderCollectionPhone;
+    if (updates.riderCollectionLicense !== undefined) dbUpdates.rider_collection_license  = updates.riderCollectionLicense;
+    if (updates.riderDeliveryId        !== undefined) dbUpdates.rider_delivery_id         = updates.riderDeliveryId;
+    if (updates.riderDeliveryName      !== undefined) dbUpdates.rider_delivery_name       = updates.riderDeliveryName;
+    if (updates.riderDeliveryPhone     !== undefined) dbUpdates.rider_delivery_phone      = updates.riderDeliveryPhone;
+    if (updates.otpWarehouseVerified   !== undefined) dbUpdates.otp_warehouse_verified    = updates.otpWarehouseVerified;
+    if (updates.otpDeliveryVerified    !== undefined) dbUpdates.otp_delivery_verified     = updates.otpDeliveryVerified;
 
     console.log("[updatePkg] writing to DB:", { id, dbUpdates });
     const { data: updatedRow, error } = await supabase.from("packages").update(dbUpdates).eq("id", id).select().single();
@@ -2326,8 +2330,11 @@ export default function App() {
   const onAcceptCollection = async (pkgId, riderId) => {
     const pkg = packages.find(p => p.id === pkgId);
     await updatePkg(pkgId, {
-      riderCollectionId: riderId,
-      status:            "awaiting_collection",
+      riderCollectionId:      riderId,
+      riderCollectionName:    user.name,
+      riderCollectionPhone:   user.phone         || "",
+      riderCollectionLicense: user.licenseNumber || "",
+      status:                 "awaiting_collection",
     });
     await addLog(pkgId, user.id, "rider", user.name, "ACCEPTED_ORDER", pkg?.pickupAddress, `${user.name} accepted — heading to collect`);
   };
@@ -2355,7 +2362,11 @@ export default function App() {
 
   const onDispatch = async (pkgId, riderId) => {
     const assignedRider = riders.find(r => r.id === riderId);
-    await updatePkg(pkgId, { riderDeliveryId: riderId });
+    await updatePkg(pkgId, {
+      riderDeliveryId:    riderId,
+      riderDeliveryName:  assignedRider?.name  || "",
+      riderDeliveryPhone: assignedRider?.phone || "",
+    });
     await addLog(pkgId, user.id, "admin", user.name, "DISPATCHED_TO_RIDER", "Baruk Central, CBD", `Assigned to ${assignedRider?.name || riderId} — awaiting collection from hub`);
   };
 
