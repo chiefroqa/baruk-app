@@ -250,14 +250,16 @@ const RIDERS = [
 // ============================================================
 const StatusBadge = ({ status }) => {
   const config = {
-    pickup_requested:          { label: "Pickup Requested",  color: "#8B5CF6", bg: "#EDE9FE" },
-    searching_rider:           { label: "Searching Rider",   color: "#F59E0B", bg: "#FEF3C7" },
-    rider_accepted_collection: { label: "Rider Accepted",    color: "#F97316", bg: "#FFF7ED" },
-    picked_up:                 { label: "Collected",         color: "#F87171", bg: "#FEF2F2" },
-    at_warehouse:              { label: "At Warehouse",      color: "#8B5CF6", bg: "#EDE9FE" },
-    out_for_delivery:          { label: "Out for Delivery",  color: "#10B981", bg: "#D1FAE5" },
-    delivered:                 { label: "Delivered",         color: "#059669", bg: "#ECFDF5" },
-    cancelled:                 { label: "Cancelled",         color: "#EF4444", bg: "#FEE2E2" },
+    pickup_requested:  { label: "Pickup Requested",   color: "#8B5CF6", bg: "#EDE9FE" },
+    searching_rider:   { label: "Searching Rider",     color: "#F59E0B", bg: "#FEF3C7" },
+    awaiting_collection:{ label: "Rider En Route",     color: "#0EA5E9", bg: "#E0F2FE" },
+    picked_up:         { label: "Picked Up",           color: "#F87171", bg: "#FEF2F2" },
+    pending_warehouse: { label: "Pending Acceptance",  color: "#8B5CF6", bg: "#EEF2FF" },
+    at_warehouse:      { label: "At Warehouse",        color: "#6366F1", bg: "#EEF2FF" },
+    out_for_delivery:  { label: "Out for Delivery",    color: "#10B981", bg: "#D1FAE5" },
+    pending_delivery:  { label: "Pending Confirmation",color: "#F97316", bg: "#FFF7ED" },
+    delivered:         { label: "Delivered",           color: "#059669", bg: "#ECFDF5" },
+    cancelled:         { label: "Cancelled",           color: "#EF4444", bg: "#FEE2E2" },
   };
   const c = config[status] || { label: status, color: "#6B7280", bg: "#F3F4F6" };
   return (
@@ -325,31 +327,7 @@ const Stat = ({ label, value, sub, color = "#DC2626" }) => (
   </div>
 );
 
-const EVENT_LABELS = {
-  ORDER_PLACED:              "Order Placed",
-  PICKUP_REQUESTED:          "Pickup Requested",
-  RIDER_ACCEPTED_COLLECTION: "Rider Accepted — On the Way",
-  PACKAGE_COLLECTED:         "Collected",
-  COLLECTED_FROM_CUSTOMER:   "Collected",
-  ARRIVED_AT_WAREHOUSE:      "Arrived at Hub",
-  WAREHOUSE_ACCEPTED:        "Accepted at Hub",
-  DISPATCHED_TO_RIDER:       "Dispatched to Rider",
-  ACCEPTED_DELIVERY_JOB:     "Rider Accepted Delivery",
-  OUT_FOR_DELIVERY:          "Out for Delivery",
-  OTP_WAREHOUSE_VERIFIED:    "OTP Verified (Hub)",
-  OTP_DELIVERY_VERIFIED:     "OTP Verified (Delivery)",
-  DELIVERED:                 "Delivered",
-};
-
-const Timeline = ({ logs }) => {
-  const getLabel = (event) => {
-    if (!event) return "Unknown";
-    // Try exact match first, then uppercase, then title-case fallback
-    return EVENT_LABELS[event]
-      || EVENT_LABELS[event.toUpperCase()]
-      || event.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
-  };
-  return (
+const Timeline = ({ logs }) => (
   <div style={{ position: "relative" }}>
     {logs.map((log, i) => (
       <div key={log.id} style={{ display: "flex", gap: 12, marginBottom: i < logs.length - 1 ? 16 : 0 }}>
@@ -358,7 +336,7 @@ const Timeline = ({ logs }) => {
           {i < logs.length - 1 && <div style={{ width: 2, flex: 1, background: "#E5E7EB", marginTop: 4 }} />}
         </div>
         <div style={{ paddingBottom: i < logs.length - 1 ? 16 : 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>{getLabel(log.event)}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>{log.event.replace(/_/g, " ")}</div>
           <div style={{ fontSize: 12, color: "#6B7280" }}>{log.actorName} • {log.location}</div>
           <div style={{ fontSize: 11, color: "#9CA3AF" }}>{new Date(log.createdAt).toLocaleString()}</div>
           {log.notes && <div style={{ fontSize: 12, color: "#DC2626", marginTop: 2, fontStyle: "italic" }}>"{log.notes}"</div>}
@@ -366,8 +344,7 @@ const Timeline = ({ logs }) => {
       </div>
     ))}
   </div>
-  );
-};
+);
 
 // ============================================================
 // CUSTOMER APP
@@ -432,24 +409,22 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
   };
 
   const TrackingProgress = ({ status }) => {
-    const steps  = ["searching_rider","rider_accepted_collection","picked_up","at_warehouse","out_for_delivery","delivered"];
-    const labels = ["Searching","Accepted","Collected","At Hub","En Route","Delivered"];
+    const steps  = ["searching_rider","awaiting_collection","picked_up","pending_warehouse","at_warehouse","out_for_delivery","pending_delivery","delivered"];
+    const labels = ["Searching","En Route","Picked Up","At Hub","Accepted","Out","Confirming","Delivered"];
     const idx    = steps.indexOf(status);
     return (
-      <div style={{ margin: "14px 0" }}>
-        <div style={{ display: "flex", alignItems: "flex-start" }}>
-          {steps.map((s, i) => (
-            <div key={s} style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1, minWidth: 0 }}>
-                <div style={{ width: 20, height: 20, borderRadius: "50%", background: i <= idx ? "#DC2626" : "#E5E7EB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: i <= idx ? "#fff" : "#9CA3AF", fontWeight: 700, flexShrink: 0 }}>
-                  {i < idx ? "✓" : i + 1}
-                </div>
-                <div style={{ fontSize: 8, textAlign: "center", color: i <= idx ? "#DC2626" : "#9CA3AF", fontWeight: i === idx ? 800 : 500, marginTop: 3, lineHeight: 1.2, maxWidth: "100%", wordBreak: "break-word" }}>{labels[i]}</div>
+      <div style={{ display: "flex", alignItems: "center", margin: "16px 0" }}>
+        {steps.map((s, i) => (
+          <div key={s} style={{ display: "flex", alignItems: "center", flex: 1 }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
+              <div style={{ width: 24, height: 24, borderRadius: "50%", background: i <= idx ? "#DC2626" : "#E5E7EB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: i <= idx ? "#fff" : "#9CA3AF", fontWeight: 700, flexShrink: 0 }}>
+                {i < idx ? "✓" : i + 1}
               </div>
-              {i < steps.length - 1 && <div style={{ height: 2, flex: 1, background: i < idx ? "#DC2626" : "#E5E7EB", margin: "0 1px", marginBottom: 18, flexShrink: 0 }} />}
+              <div style={{ fontSize: 9, textAlign: "center", color: i <= idx ? "#DC2626" : "#9CA3AF", fontWeight: i === idx ? 800 : 500, marginTop: 4, lineHeight: 1.2, width: 52 }}>{labels[i]}</div>
             </div>
-          ))}
-        </div>
+            {i < steps.length - 1 && <div style={{ height: 2, flex: 1, background: i < idx ? "#DC2626" : "#E5E7EB", margin: "0 2px", marginBottom: 20, flexShrink: 0 }} />}
+          </div>
+        ))}
       </div>
     );
   };
@@ -579,7 +554,7 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
 
   // ── Main view ───────────────────────────────────────────────
   return (
-    <div style={{ maxWidth: 480, margin: "0 auto", fontFamily: "'DM Sans', system-ui, sans-serif", width: "100%" }}>
+    <div style={{ maxWidth: 480, margin: "0 auto", fontFamily: "'DM Sans', system-ui, sans-serif" }}>
       {/* Header */}
       <div style={{ background: "#fff", padding: "20px 20px 0", borderRadius: "0 0 24px 24px", borderBottom: "2px solid #FECACA", boxShadow: "0 2px 16px rgba(220,38,38,0.08)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
@@ -711,37 +686,32 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
               </Card>
             )}
             {packages.map(pkg => (
-              <div key={pkg.id} onClick={() => setExpandedPkg(expandedPkg === pkg.id ? null : pkg.id)}
-                style={{ background: "#fff", borderRadius: 16, marginBottom: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.07), 0 4px 20px rgba(0,0,0,0.04)", cursor: "pointer" }}>
-                {/* Always-visible header */}
-                <div style={{ padding: "16px 16px 12px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#111827", fontFamily: "monospace" }}>{pkg.trackingCode}</div>
-                      <div style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>{pkg.description}</div>
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-                      <StatusBadge status={pkg.status} />
-                      {pkg.requestType === "pickup_request" && <div style={{ fontSize: 10, fontWeight: 700, color: "#7C3AED", background: "#EDE9FE", padding: "2px 8px", borderRadius: 20 }}>🛵 Pickup Req.</div>}
-                      {pkg.isHighValue && <HighValueBadge />}
-                    </div>
+              <Card key={pkg.id} style={{ marginBottom: 12, cursor: "pointer" }} onClick={() => setExpandedPkg(expandedPkg === pkg.id ? null : pkg.id)}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#111827", fontFamily: "monospace" }}>{pkg.trackingCode}</div>
+                    <div style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>{pkg.description}</div>
                   </div>
-                  {pkg.requestType === "pickup_request" && pkg.collectFromName && <div style={{ fontSize: 12, color: "#7C3AED", fontWeight: 600, marginBottom: 2 }}>🏪 {pkg.collectFromName}</div>}
-                  <div style={{ fontSize: 12, color: "#9CA3AF" }}>→ {pkg.deliveryAddress}</div>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, alignItems: "center" }}>
-                    <span style={{ fontSize: 12, color: "#6B7280" }}>KES {pkg.total}</span>
-                    <span style={{ fontSize: 12, color: "#DC2626", fontWeight: 700 }}>{expandedPkg === pkg.id ? "▲ Less" : "▼ Details"}</span>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                    <StatusBadge status={pkg.status} />
+                    {pkg.requestType === "pickup_request" && <div style={{ fontSize: 10, fontWeight: 700, color: "#7C3AED", background: "#EDE9FE", padding: "2px 8px", borderRadius: 20 }}>🛵 Pickup Req.</div>}
+                    {pkg.isHighValue && <HighValueBadge />}
                   </div>
                 </div>
-                {/* Expanded detail panel */}
+                {pkg.requestType === "pickup_request" && pkg.collectFromName && <div style={{ fontSize: 12, color: "#7C3AED", fontWeight: 600, marginBottom: 2 }}>🏪 {pkg.collectFromName}</div>}
+                <div style={{ fontSize: 12, color: "#9CA3AF" }}>→ {pkg.deliveryAddress}</div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: "#6B7280" }}>KES {pkg.total}</span>
+                  <span style={{ fontSize: 12, color: "#DC2626", fontWeight: 700 }}>{expandedPkg === pkg.id ? "▲ Less" : "▼ Details"}</span>
+                </div>
                 {expandedPkg === pkg.id && (
-                  <div style={{ borderTop: "1px solid #F3F4F6", padding: "14px 16px 16px" }}>
+                  <div style={{ marginTop: 14, borderTop: "1px solid #F3F4F6", paddingTop: 14 }}>
                     <TrackingProgress status={pkg.status} />
                     <div style={{ fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 10 }}>Chain of Custody</div>
                     <Timeline logs={transitLogs.filter(l => l.packageId === pkg.id)} />
                   </div>
                 )}
-              </div>
+              </Card>
             ))}
           </div>
         )}
@@ -753,15 +723,17 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
 // ============================================================
 // RIDER APP
 // ============================================================
-function RiderApp({ packages, onAcceptCollection, onConfirmCollected, onMarkAtWarehouse, onAcceptDelivery, onVerifyOTP, onMarkDelivered, transitLogs, currentRider }) {
-  const rider = currentRider || RIDERS[0];
+function RiderApp({ packages, onAcceptCollection, onConfirmCollection, onMarkAtWarehouse, onCollectedFromWarehouse, onAcceptDelivery, onVerifyOTP, onMarkDelivered, transitLogs, currentRider, customers = [] }) {
+  const rider = currentRider || {};
   const [feed, setFeed] = useState("collection");
   const [otpInput, setOtpInput] = useState({});
   const [otpError, setOtpError] = useState({});
 
   const collectionFeed = packages.filter(p => p.status === "searching_rider" && !p.riderCollectionId);
-  const myActive = packages.filter(p => p.riderCollectionId === rider.id || p.riderDeliveryId === rider.id);
-  const deliveryFeed = packages.filter(p => p.riderDeliveryId === rider.id && p.status === "at_warehouse");
+  const deliveryFeed   = packages.filter(p => p.riderDeliveryId === rider.id && p.status === "at_warehouse");
+  const myActive       = packages.filter(p => p.riderCollectionId === rider.id || p.riderDeliveryId === rider.id);
+  const myCompleted    = myActive.filter(p => p.status === "delivered");
+  const myInProgress   = myActive.filter(p => p.status !== "delivered" && !(p.riderDeliveryId === rider.id && p.status === "at_warehouse"));
 
   const handleOTPVerify = (pkg, type) => {
     const entered = otpInput[`${pkg.id}-${type}`] || "";
@@ -776,9 +748,11 @@ function RiderApp({ packages, onAcceptCollection, onConfirmCollected, onMarkAtWa
 
   const PkgCard = ({ pkg }) => {
     const isMyCollection = pkg.riderCollectionId === rider.id;
-    const isMyDelivery = pkg.riderDeliveryId === rider.id;
+    const isMyDelivery   = pkg.riderDeliveryId   === rider.id;
     const needsWarehouseOTP = pkg.isHighValue && isMyCollection && pkg.status === "at_warehouse" && !pkg.otpWarehouseVerified;
-    const needsDeliveryOTP = pkg.isHighValue && isMyDelivery && pkg.status === "out_for_delivery" && !pkg.otpDeliveryVerified;
+    const needsDeliveryOTP  = pkg.isHighValue && isMyDelivery   && pkg.status === "out_for_delivery" && !pkg.otpDeliveryVerified;
+    const [busy, setBusy] = useState(false);
+    const doAction = async (fn) => { if (busy) return; setBusy(true); try { await fn(); } finally { setBusy(false); } };
 
     return (
       <Card style={{ marginBottom: 12 }}>
@@ -805,20 +779,65 @@ function RiderApp({ packages, onAcceptCollection, onConfirmCollected, onMarkAtWa
           <span>Zone: <strong style={{ color: "#374151" }}>{pkg.deliveryZone}</strong></span>
           <span>KES {pkg.declaredValue.toLocaleString()} value</span>
         </div>
-
+        {/* Sender contact for collection rider */}
+        {isMyCollection && !isMyDelivery && pkg.status !== "searching_rider" && (() => {
+          const sender = customers.find(cu => cu.id === pkg.customerId);
+          return sender ? (
+            <div style={{ marginTop: 10, background: "#EFF6FF", border: "1.5px solid #BFDBFE", borderRadius: 10, padding: "10px 12px" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#1D4ED8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>📬 Sender Contact</div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: "#111827" }}>{sender.name}</div>
+                  <div style={{ fontSize: 12, color: "#6B7280", marginTop: 1 }}>{sender.phone}</div>
+                </div>
+                <a href={`tel:${sender.phone}`} style={{ background: "#2563EB", color: "#fff", padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700, textDecoration: "none", flexShrink: 0 }}>📞 Call</a>
+              </div>
+            </div>
+          ) : null;
+        })()}
+        {/* Recipient contact for delivery rider */}
+        {isMyDelivery && (
+          <div style={{ marginTop: 10, background: "#F0FDF4", border: "1.5px solid #6EE7B7", borderRadius: 10, padding: "10px 12px" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#065F46", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>🏠 Recipient Contact</div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: "#111827" }}>{pkg.recipientName || "(name not provided)"}</div>
+                <div style={{ fontSize: 12, color: "#6B7280", marginTop: 1 }}>{pkg.recipientPhone || pkg.deliveryAddress}</div>
+              </div>
+              {pkg.recipientPhone && (
+                <a href={`tel:${pkg.recipientPhone}`} style={{ background: "#10B981", color: "#fff", padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700, textDecoration: "none", flexShrink: 0 }}>📞 Call</a>
+              )}
+            </div>
+          </div>
+        )}
         {/* Actions */}
         <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
           {pkg.status === "searching_rider" && !isMyCollection && (
-            <Btn onClick={() => onAcceptCollection(pkg.id, rider.id)} variant="primary">Accept Collection</Btn>
+            <Btn onClick={() => doAction(() => onAcceptCollection(pkg.id, rider.id))} variant="primary" disabled={busy}>{busy ? "Accepting…" : "✅ Accept Order"}</Btn>
           )}
-          {pkg.status === "rider_accepted_collection" && isMyCollection && (
-            <div style={{ background: "#FFF7ED", border: "1.5px solid #FED7AA", borderRadius: 10, padding: "10px 12px" }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#92400E", marginBottom: 8 }}>🏍️ Head to pickup address and collect the package</div>
-              <Btn onClick={() => onConfirmCollected(pkg.id)} variant="success" style={{ width: "100%" }}>✓ Confirm Collected</Btn>
+          {pkg.status === "awaiting_collection" && isMyCollection && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ background: "#E0F2FE", border: "1.5px solid #BAE6FD", borderRadius: 10, padding: "10px 12px" }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: "#0369A1" }}>🏍️ Heading to sender — collect the package</div>
+                <div style={{ fontSize: 12, color: "#0284C7", marginTop: 2 }}>Once you physically have it, tap confirm below.</div>
+              </div>
+              <Btn onClick={() => doAction(() => onConfirmCollection(pkg.id))} variant="success" disabled={busy}>{busy ? "Confirming…" : "📦 Confirm Collection"}</Btn>
             </div>
           )}
           {pkg.status === "picked_up" && isMyCollection && (
-            <Btn onClick={() => onMarkAtWarehouse(pkg.id)} variant="success">✓ Mark: Arrived at Warehouse</Btn>
+            <Btn onClick={() => doAction(() => onMarkAtWarehouse(pkg.id))} variant="success" disabled={busy}>{busy ? "Saving…" : "🏭 Arrived at Warehouse"}</Btn>
+          )}
+          {pkg.status === "pending_warehouse" && isMyCollection && (
+            <div style={{ background: "#EEF2FF", border: "1.5px solid #C7D2FE", borderRadius: 10, padding: "10px 12px" }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: "#3730A3" }}>⏳ Waiting for warehouse acceptance</div>
+              <div style={{ fontSize: 12, color: "#4338CA", marginTop: 2 }}>The admin will confirm receipt of the package.</div>
+            </div>
+          )}
+          {pkg.status === "at_warehouse" && isMyCollection && !isMyDelivery && (
+            <div style={{ background: "#F0FDF4", border: "1.5px solid #6EE7B7", borderRadius: 10, padding: "10px 12px" }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: "#065F46" }}>✅ Accepted at warehouse</div>
+              <div style={{ fontSize: 12, color: "#047857", marginTop: 2 }}>Awaiting dispatch to delivery rider.</div>
+            </div>
           )}
           {needsWarehouseOTP && (
             <div style={{ background: "#FEF2F2", border: "1.5px solid #FCA5A5", borderRadius: 10, padding: 12 }}>
@@ -832,24 +851,34 @@ function RiderApp({ packages, onAcceptCollection, onConfirmCollected, onMarkAtWa
             </div>
           )}
           {pkg.status === "at_warehouse" && isMyDelivery && (
-            <div style={{ background: "#EEF2FF", border: "1.5px solid #C7D2FE", borderRadius: 10, padding: "10px 12px" }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#3730A3", marginBottom: 8 }}>📦 Package dispatched to you — collect from hub</div>
-              <Btn onClick={() => onAcceptDelivery(pkg.id, rider.id)} variant="primary" style={{ width: "100%" }}>✅ Accept &amp; Collected from Hub</Btn>
-            </div>
+            <Btn onClick={() => doAction(() => onAcceptDelivery(pkg.id))} variant="primary" disabled={busy}>{busy ? "Accepting…" : "✅ Accept Delivery Job"}</Btn>
           )}
-          {needsDeliveryOTP && (
-            <div style={{ background: "#FEF2F2", border: "1.5px solid #FCA5A5", borderRadius: 10, padding: 12 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#7F1D1D", marginBottom: 8 }}>🔐 Customer OTP Verification</div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <input maxLength={4} value={otpInput[`${pkg.id}-delivery`] || ""} onChange={e => setOtpInput(o => ({...o, [`${pkg.id}-delivery`]: e.target.value}))}
-                  placeholder="- - - -" style={{ flex: 1, padding: "8px 12px", border: `1.5px solid ${otpError[`${pkg.id}-delivery`] ? "#EF4444" : "#E5E7EB"}`, borderRadius: 8, fontSize: 18, textAlign: "center", letterSpacing: 6, fontFamily: "monospace" }} />
-                <Btn onClick={() => handleOTPVerify(pkg, "delivery")} variant="purple" size="sm">Verify</Btn>
+          {pkg.status === "out_for_delivery" && isMyDelivery && (
+            needsDeliveryOTP ? (
+              <div style={{ background: "#FEF2F2", border: "1.5px solid #FCA5A5", borderRadius: 10, padding: 12 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#7F1D1D", marginBottom: 8 }}>🔐 Customer OTP Verification</div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input maxLength={4} value={otpInput[`${pkg.id}-delivery`] || ""} onChange={e => setOtpInput(o => ({...o, [`${pkg.id}-delivery`]: e.target.value}))}
+                    placeholder="- - - -" style={{ flex: 1, padding: "8px 12px", border: `1.5px solid ${otpError[`${pkg.id}-delivery`] ? "#EF4444" : "#E5E7EB"}`, borderRadius: 8, fontSize: 18, textAlign: "center", letterSpacing: 6, fontFamily: "monospace" }} />
+                  <Btn onClick={() => handleOTPVerify(pkg, "delivery")} variant="purple" size="sm">Verify</Btn>
+                </div>
+                {otpError[`${pkg.id}-delivery`] && <div style={{ color: "#EF4444", fontSize: 12, marginTop: 6 }}>❌ Incorrect OTP. Try again.</div>}
               </div>
-              {otpError[`${pkg.id}-delivery`] && <div style={{ color: "#EF4444", fontSize: 12, marginTop: 6 }}>❌ Incorrect OTP. Try again.</div>}
+            ) : (
+              <Btn onClick={() => doAction(() => onMarkDelivered(pkg.id))} variant="success" disabled={busy}>{busy ? "Saving…" : "🎉 Mark as Delivered"}</Btn>
+            )
+          )}
+          {pkg.status === "pending_delivery" && isMyDelivery && (
+            <div style={{ background: "#FFF7ED", border: "1.5px solid #FED7AA", borderRadius: 10, padding: "10px 12px" }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: "#9A3412" }}>📬 Delivery reported</div>
+              <div style={{ fontSize: 12, color: "#C2410C", marginTop: 2 }}>Waiting for admin to confirm delivery.</div>
             </div>
           )}
-          {pkg.status === "out_for_delivery" && isMyDelivery && (!pkg.isHighValue || pkg.otpDeliveryVerified) && (
-            <Btn onClick={() => onMarkDelivered(pkg.id, rider.id)} variant="success">✓ Mark as Delivered</Btn>
+          {pkg.status === "delivered" && (
+            <div style={{ background: "#ECFDF5", border: "1.5px solid #6EE7B7", borderRadius: 10, padding: "10px 12px" }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: "#065F46" }}>🎉 Delivered & Confirmed</div>
+              <div style={{ fontSize: 12, color: "#047857", marginTop: 2 }}>This delivery is complete.</div>
+            </div>
           )}
         </div>
       </Card>
@@ -858,7 +887,6 @@ function RiderApp({ packages, onAcceptCollection, onConfirmCollected, onMarkAtWa
 
   return (
     <div style={{ maxWidth: 420, margin: "0 auto", fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
-      {/* Header */}
       <div style={{ background: "#1F2937", padding: "20px 20px 0", borderRadius: "0 0 24px 24px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
           <div>
@@ -871,31 +899,50 @@ function RiderApp({ packages, onAcceptCollection, onConfirmCollected, onMarkAtWa
           </div>
         </div>
         <div style={{ display: "flex", gap: 2, marginTop: 16 }}>
-          {[["collection","🏠 Collection Feed"],["delivery","📦 Delivery Feed"],["active","⚡ My Active"]].map(([v,l]) => (
-            <button key={v} onClick={() => setFeed(v)} style={{ flex: 1, padding: "10px 4px", border: "none", background: feed === v ? "#fff" : "transparent", color: feed === v ? "#1F2937" : "rgba(255,255,255,0.6)", fontWeight: 600, borderRadius: "8px 8px 0 0", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>{l}</button>
+          {[
+            ["collection", "📦 Collect",  collectionFeed.length],
+            ["delivery",   "🚀 Deliver",  deliveryFeed.length],
+            ["active",     "⚡ Active",   myInProgress.length],
+            ["done",       "✅ Done",     myCompleted.length],
+          ].map(([v, l, count]) => (
+            <button key={v} onClick={() => setFeed(v)} style={{ flex: 1, padding: "8px 2px", border: "none", background: feed === v ? "#fff" : "transparent", color: feed === v ? "#1F2937" : "rgba(255,255,255,0.6)", fontWeight: 700, borderRadius: "8px 8px 0 0", cursor: "pointer", fontSize: 10, fontFamily: "inherit", position: "relative" }}>
+              {l}
+              {count > 0 && <span style={{ position: "absolute", top: 4, right: 6, background: feed === v ? "#DC2626" : "rgba(220,38,38,0.8)", color: "#fff", borderRadius: "50%", width: 16, height: 16, fontSize: 9, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900 }}>{count}</span>}
+            </button>
           ))}
         </div>
       </div>
-
       <div style={{ padding: "16px" }}>
         {feed === "collection" && (
           <div>
-            <div style={{ fontSize: 13, color: "#6B7280", marginBottom: 12 }}>Packages in your zone to collect & bring to Hub:</div>
-            {collectionFeed.length === 0 ? <Card style={{ textAlign: "center", color: "#9CA3AF" }}>No collection requests right now</Card> :
-              collectionFeed.map(p => <PkgCard key={p.id} pkg={p} />)}
+            <div style={{ fontSize: 13, color: "#6B7280", marginBottom: 12 }}>Open collection jobs — accept one to pick up from customer:</div>
+            {collectionFeed.length === 0
+              ? <Card style={{ textAlign: "center", padding: "32px 20px", color: "#9CA3AF" }}><div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>No collection jobs right now</Card>
+              : collectionFeed.map(p => <PkgCard key={p.id} pkg={p} />)}
           </div>
         )}
         {feed === "delivery" && (
           <div>
-            <div style={{ fontSize: 13, color: "#6B7280", marginBottom: 12 }}>Packages at Hub destined for <strong>{rider.zone}</strong>:</div>
-            {deliveryFeed.length === 0 ? <Card style={{ textAlign: "center", color: "#9CA3AF" }}>No deliveries waiting for your zone</Card> :
-              deliveryFeed.map(p => <PkgCard key={p.id} pkg={p} />)}
+            <div style={{ fontSize: 13, color: "#6B7280", marginBottom: 12 }}>Packages dispatched to you — collect from hub and deliver:</div>
+            {deliveryFeed.length === 0
+              ? <Card style={{ textAlign: "center", padding: "32px 20px", color: "#9CA3AF" }}><div style={{ fontSize: 32, marginBottom: 8 }}>🏭</div>No deliveries assigned to you yet</Card>
+              : deliveryFeed.map(p => <PkgCard key={p.id} pkg={p} />)}
           </div>
         )}
         {feed === "active" && (
           <div>
-            {myActive.length === 0 ? <Card style={{ textAlign: "center", color: "#9CA3AF" }}>No active packages</Card> :
-              myActive.map(p => <PkgCard key={p.id} pkg={p} />)}
+            <div style={{ fontSize: 13, color: "#6B7280", marginBottom: 12 }}>Your packages currently in progress:</div>
+            {myInProgress.length === 0
+              ? <Card style={{ textAlign: "center", padding: "32px 20px", color: "#9CA3AF" }}><div style={{ fontSize: 32, marginBottom: 8 }}>✨</div>Nothing active right now</Card>
+              : myInProgress.map(p => <PkgCard key={p.id} pkg={p} />)}
+          </div>
+        )}
+        {feed === "done" && (
+          <div>
+            <div style={{ fontSize: 13, color: "#6B7280", marginBottom: 12 }}>Completed deliveries:</div>
+            {myCompleted.length === 0
+              ? <Card style={{ textAlign: "center", padding: "32px 20px", color: "#9CA3AF" }}><div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>No completed deliveries yet</Card>
+              : myCompleted.map(p => <PkgCard key={p.id} pkg={p} />)}
           </div>
         )}
       </div>
@@ -903,11 +950,34 @@ function RiderApp({ packages, onAcceptCollection, onConfirmCollected, onMarkAtWa
   );
 }
 
+
+// ── Stateful admin action buttons ──
+const AcceptWarehouseBtn = ({ pkgId, onAcceptAtWarehouse }) => {
+  const [busy, setBusy] = useState(false);
+  const handle = async () => { setBusy(true); try { await onAcceptAtWarehouse(pkgId); } finally { setBusy(false); } };
+  return (
+    <Btn onClick={handle} variant="success" disabled={busy} style={{ width: "100%" }}>
+      {busy ? "⏳ Accepting…" : "✅ Condition Verified — Accept Package"}
+    </Btn>
+  );
+};
+
+const ConfirmDeliveryBtn = ({ pkgId, onConfirmDelivery }) => {
+  const [busy, setBusy] = useState(false);
+  const handle = async () => { setBusy(true); try { await onConfirmDelivery(pkgId); } finally { setBusy(false); } };
+  return (
+    <Btn onClick={handle} variant="success" disabled={busy} style={{ width: "100%" }}>
+      {busy ? "⏳ Confirming…" : "✅ Confirm Delivery Complete"}
+    </Btn>
+  );
+};
+
 // ============================================================
 // ADMIN DASHBOARD
 // ============================================================
-function AdminDashboard({ packages, riders, transitLogs, onDispatch, onAddRider, accounts }) {
+function AdminDashboard({ packages, riders, customers, transitLogs, onDispatch, onAcceptAtWarehouse, onConfirmDelivery, onAddRider, accounts, onRefresh }) {
   const [view, setView] = useState("hub");
+  useEffect(() => { if (onRefresh) onRefresh(); }, []);
   const [selectedPkg, setSelectedPkg] = useState(null);
   const [selectedRider, setSelectedRider] = useState("");
   const [showAddRider, setShowAddRider] = useState(false);
@@ -936,17 +1006,28 @@ function AdminDashboard({ packages, riders, transitLogs, onDispatch, onAddRider,
   const [otpInput, setOtpInput] = useState("");
   const [otpError, setOtpError] = useState(false);
 
-  const atHub = packages.filter(p => p.status === "at_warehouse");
-  const inTransit = packages.filter(p => ["searching_rider","picked_up","out_for_delivery"].includes(p.status));
+  const pendingAcceptance = packages.filter(p => p.status === "pending_warehouse");
+  const atHubUnassigned   = packages.filter(p => p.status === "at_warehouse" && !p.riderDeliveryId);
+  const atHubDispatched   = packages.filter(p => p.status === "at_warehouse" && p.riderDeliveryId);
+  const atHub             = packages.filter(p => p.status === "at_warehouse");
+  const pendingDelivery   = packages.filter(p => p.status === "pending_delivery");
+  const newRequests       = packages.filter(p => p.status === "searching_rider");
+  const inTransit = packages.filter(p => ["searching_rider","awaiting_collection","picked_up","pending_warehouse","at_warehouse","out_for_delivery","pending_delivery"].includes(p.status));
   const delivered = packages.filter(p => p.status === "delivered");
   const totalFees = packages.reduce((s, p) => s + p.total, 0);
   const totalValue = inTransit.reduce((s, p) => s + p.declaredValue, 0);
 
-  const handleDispatch = (pkg) => {
-    if (!selectedRider) return;
-    onDispatch(pkg.id, selectedRider);
-    setSelectedPkg(null);
-    setSelectedRider("");
+  const [dispatching, setDispatching] = useState(false);
+  const handleDispatch = async (pkg) => {
+    if (!selectedRider || dispatching) return;
+    setDispatching(true);
+    try {
+      await onDispatch(pkg.id, selectedRider);
+      setSelectedPkg(null);
+      setSelectedRider("");
+    } finally {
+      setDispatching(false);
+    }
   };
 
   return (
@@ -960,90 +1041,275 @@ function AdminDashboard({ packages, riders, transitLogs, onDispatch, onAddRider,
             <div style={{ fontSize: 11, color: "#9CA3AF" }}>Central Warehouse Operations</div>
           </div>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          {[["hub","📦 Hub Inventory"],["riders","🏍️ Riders"],["logs","📋 Custody Logs"],["revenue","💰 Revenue"]].map(([v, l]) => (
-            <button key={v} onClick={() => setView(v)} style={{ padding: "6px 14px", border: "none", background: view === v ? "#DC2626" : "#F3F4F6", color: view === v ? "#fff" : "#6B7280", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "inherit" }}>{l}</button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {[
+            ["hub",       "📦 Hub",        pendingAcceptance.length + pendingDelivery.length],
+            ["requests",  "📋 Requests",   newRequests.length],
+            ["riders",    "🏍️ Riders",     0],
+            ["customers", "👥 Customers",  0],
+            ["logs",      "📋 Custody",    0],
+            ["revenue",   "💰 Revenue",    0],
+            ["debug",     "🔧 Debug",      0],
+          ].map(([v, l, badge]) => (
+            <button key={v} onClick={() => setView(v)} style={{ padding: "6px 14px", border: "none", background: view === v ? "#DC2626" : "#F3F4F6", color: view === v ? "#fff" : "#6B7280", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "inherit", position: "relative" }}>
+              {l}
+              {badge > 0 && <span style={{ position: "absolute", top: -4, right: -4, background: "#F59E0B", color: "#fff", borderRadius: "50%", width: 18, height: 18, fontSize: 10, display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 900 }}>{badge}</span>}
+            </button>
           ))}
         </div>
       </div>
 
       <div style={{ padding: 24 }}>
-        {/* Stats Bar */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
+        {/* Stats Bar — 8 clickable tiles */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 10, marginBottom: 24 }}>
           {[
-            { label: "At Hub", value: atHub.length, sub: "packages", color: "#DC2626" },
-            { label: "In Transit", value: inTransit.length, sub: "packages", color: "#EF4444" },
-            { label: "Delivered Today", value: delivered.length, sub: "packages", color: "#10B981" },
-            { label: "Revenue", value: `KES ${totalFees.toLocaleString()}`, sub: "collected", color: "#DC2626" },
+            { label: "Pending Accept",    value: pendingAcceptance.length, sub: "need action",      color: "#F59E0B", tab: "hub",       urgent: pendingAcceptance.length > 0 },
+            { label: "At Hub",            value: atHub.length,             sub: "ready to dispatch", color: "#6366F1", tab: "hub",       urgent: false },
+            { label: "In Transit",        value: inTransit.length,         sub: "packages",          color: "#EF4444", tab: "hub",       urgent: false },
+            { label: "New Requests",      value: newRequests.length,       sub: "incoming",          color: "#0EA5E9", tab: "requests",  urgent: newRequests.length > 0 },
+            { label: "Pending Delivery",  value: pendingDelivery.length,   sub: "to confirm",        color: "#F97316", tab: "hub",       urgent: pendingDelivery.length > 0 },
+            { label: "Delivered",         value: delivered.length,         sub: "packages",          color: "#10B981", tab: "logs",      urgent: false },
+            { label: "Customers",         value: customers.length,         sub: "registered",        color: "#7C3AED", tab: "customers", urgent: false },
+            { label: "Revenue",           value: `KES ${totalFees.toLocaleString()}`, sub: "collected", color: "#DC2626", tab: "revenue", urgent: false },
           ].map(s => (
-            <Card key={s.label} style={{ textAlign: "center" }}>
-              <Stat {...s} />
-            </Card>
+            <div key={s.label} onClick={() => setView(s.tab)} style={{ cursor: "pointer" }}>
+              <Card style={{ textAlign: "center", border: s.urgent ? `2px solid ${s.color}` : "none", boxShadow: s.urgent ? `0 0 0 3px ${s.color}22` : undefined }}>
+                <Stat {...s} />
+                {s.urgent && <div style={{ fontSize: 9, fontWeight: 800, color: s.color, textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 4 }}>● ACTION NEEDED</div>}
+              </Card>
+            </div>
           ))}
         </div>
 
         {view === "hub" && (
           <div>
             <div style={{ fontSize: 18, fontWeight: 600, color: "#111827", marginBottom: 16 }}>Hub Inventory — {atHub.length} Packages</div>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", background: "#fff", borderRadius: 16, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-                <thead>
-                  <tr style={{ background: "#F9FAFB" }}>
-                    {["Tracking","Description","Customer","Destination Zone","Value","Fees","Flags","Action"].map(h => (
-                      <th key={h} style={{ padding: "12px 16px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: "1px solid #E5E7EB" }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {atHub.map((pkg, i) => (
-                    <tr key={pkg.id} style={{ borderBottom: i < atHub.length - 1 ? "1px solid #F3F4F6" : "none", background: selectedPkg?.id === pkg.id ? "#FEF2F2" : "#fff" }}>
-                      <td style={{ padding: "12px 16px", fontFamily: "monospace", fontWeight: 600, fontSize: 13, color: "#111827" }}>{pkg.trackingCode}</td>
-                      <td style={{ padding: "12px 16px", fontSize: 13, color: "#374151" }}>{pkg.description}</td>
-                      <td style={{ padding: "12px 16px", fontSize: 13, color: "#374151" }}>{pkg.customerName}</td>
-                      <td style={{ padding: "12px 16px" }}>{(() => { const t = TIER_BADGE[getZoneInfo(pkg.deliveryZone).tier]; return <span style={{ background: t.bg, color: t.color, padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 700 }}>{pkg.deliveryZone}</span>; })()}</td>
-                      <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 700, color: "#111827" }}>KES {pkg.declaredValue.toLocaleString()}</td>
-                      <td style={{ padding: "12px 16px", fontSize: 13, color: "#DC2626", fontWeight: 700 }}>KES {pkg.total}</td>
-                      <td style={{ padding: "12px 16px" }}>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                          {pkg.isHighValue && <HighValueBadge />}
-                          {pkg.isHighValue && !pkg.otpWarehouseVerified && (
-                            <span style={{ fontSize: 10, color: "#DC2626", fontWeight: 700 }}>⚠ OTP PENDING</span>
-                          )}
-                          {pkg.protectionFee > 0 && (
-                            <span style={{ fontSize: 10, background: "#FEF3C7", color: "#7F1D1D", padding: "2px 6px", borderRadius: 10, fontWeight: 700 }}>PROTECTED</span>
+            {/* ── SECTION 1: Pending Warehouse Acceptance ── */}
+            <div style={{ marginBottom: 28 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                <div style={{ width: 10, height: 10, borderRadius: "50%", background: pendingAcceptance.length > 0 ? "#F59E0B" : "#D1D5DB", boxShadow: pendingAcceptance.length > 0 ? "0 0 0 3px rgba(245,158,11,0.2)" : "none" }} />
+                <div style={{ fontSize: 16, fontWeight: 800, color: pendingAcceptance.length > 0 ? "#92400E" : "#6B7280" }}>Awaiting Warehouse Acceptance — {pendingAcceptance.length} Package{pendingAcceptance.length !== 1 ? "s" : ""}</div>
+                {pendingAcceptance.length > 0 && <span style={{ background: "#FEF3C7", color: "#92400E", padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>ACTION REQUIRED</span>}
+              </div>
+              {pendingAcceptance.length === 0 ? (
+                <Card style={{ textAlign: "center", padding: "20px", background: "#F9FAFB", border: "1px dashed #E5E7EB" }}>
+                  <div style={{ fontSize: 13, color: "#9CA3AF" }}>✅ No packages awaiting warehouse acceptance right now</div>
+                </Card>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))", gap: 14 }}>
+                  {pendingAcceptance.map(pkg => {
+                    const collectionRider = riders.find(r => r.id === pkg.riderCollectionId);
+                    return (
+                      <Card key={pkg.id} style={{ border: "2px solid #FDE68A", background: "#FFFBEB" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                          <div>
+                            <div style={{ fontFamily: "monospace", fontWeight: 900, fontSize: 15, color: "#111827" }}>{pkg.trackingCode}</div>
+                            <div style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>Rider arrived — physical inspection required</div>
+                          </div>
+                          <StatusBadge status={pkg.status} />
+                        </div>
+                        <div style={{ background: "#FEF9C3", border: "1px solid #FDE68A", borderRadius: 8, padding: "8px 12px", marginBottom: 12, fontSize: 12, color: "#713F12", fontWeight: 700 }}>
+                          ⚠️ Verify the following before accepting:
+                        </div>
+                        <div style={{ background: "#fff", borderRadius: 10, padding: "12px 14px", marginBottom: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                          {[
+                            ["Description",      pkg.description],
+                            ["Size",             pkg.size],
+                            ["Declared Value",   `KES ${pkg.declaredValue?.toLocaleString()}`],
+                            ["Customer",         pkg.customerName],
+                            ["Pickup from",      pkg.pickupAddress],
+                            ["Delivering to",    pkg.deliveryAddress],
+                          ].map(([label, val]) => (
+                            <div key={label} style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                              <span style={{ color: "#6B7280", fontWeight: 600 }}>{label}</span>
+                              <span style={{ fontWeight: 700, color: "#111827", textAlign: "right", maxWidth: 200 }}>{val}</span>
+                            </div>
+                          ))}
+                          <div style={{ height: 1, background: "#F3F4F6" }} />
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                            <span style={{ color: "#6B7280", fontWeight: 600 }}>Destination Zone</span>
+                            {(() => { const t = TIER_BADGE[getZoneInfo(pkg.deliveryZone).tier]; return <span style={{ background: t.bg, color: t.color, padding: "2px 8px", borderRadius: 12, fontSize: 12, fontWeight: 700 }}>{pkg.deliveryZone}</span>; })()}
+                          </div>
+                          <div style={{ height: 1, background: "#F3F4F6" }} />
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                            <span style={{ color: "#6B7280", fontWeight: 600 }}>Brought by rider</span>
+                            <span style={{ fontWeight: 800, color: "#DC2626" }}>🏍️ {collectionRider?.name || "Unknown"}</span>
+                          </div>
+                          {collectionRider?.phone && (
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                              <span style={{ color: "#6B7280", fontWeight: 600 }}>Rider phone</span>
+                              <a href={`tel:${collectionRider.phone}`} style={{ fontWeight: 700, color: "#0EA5E9", textDecoration: "none" }}>{collectionRider.phone}</a>
+                            </div>
                           )}
                         </div>
-                      </td>
-                      <td style={{ padding: "12px 16px" }}>
-                        {pkg.riderDeliveryId ? (
-                          <span style={{ fontSize: 12, fontWeight: 700, color: "#10B981", background: "#ECFDF5", padding: "4px 10px", borderRadius: 20 }}>✓ Dispatched</span>
-                        ) : selectedPkg?.id === pkg.id ? (
-                          <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 180 }}>
-                            <select value={selectedRider} onChange={e => setSelectedRider(e.target.value)} style={{ padding: "6px 10px", border: "1.5px solid #E5E7EB", borderRadius: 8, fontSize: 13, fontFamily: "inherit" }}>
-                              <option value="">Select Rider...</option>
-                              {riders.filter(r => r.zone === pkg.deliveryZone).map(r => (
-                                <option key={r.id} value={r.id}>{r.name}</option>
-                              ))}
-                              {riders.filter(r => r.zone === pkg.deliveryZone).length === 0 &&
-                                riders.map(r => <option key={r.id} value={r.id}>{r.name} ({r.zone})</option>)}
-                            </select>
-                            <div style={{ display: "flex", gap: 6 }}>
-                              <Btn onClick={() => handleDispatch(pkg)} variant="success" size="sm" disabled={!selectedRider}>Dispatch</Btn>
-                              <Btn onClick={() => setSelectedPkg(null)} variant="ghost" size="sm">Cancel</Btn>
-                            </div>
+                        {(pkg.isHighValue || pkg.protectionFee > 0) && (
+                          <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+                            {pkg.isHighValue && <HighValueBadge />}
+                            {pkg.protectionFee > 0 && <span style={{ background: "#FEF3C7", color: "#92400E", padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>🛡️ INSURED — KES {pkg.protectionFee}</span>}
                           </div>
-                        ) : (
-                          <Btn onClick={() => setSelectedPkg(pkg)} variant="primary" size="sm">Dispatch →</Btn>
                         )}
-                      </td>
-                    </tr>
-                  ))}
-                  {atHub.length === 0 && (
-                    <tr><td colSpan={8} style={{ padding: 32, textAlign: "center", color: "#9CA3AF" }}>No packages at hub right now</td></tr>
-                  )}
-                </tbody>
-              </table>
+                        <AcceptWarehouseBtn pkgId={pkg.id} onAcceptAtWarehouse={onAcceptAtWarehouse} />
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
             </div>
+
+            {/* ── SECTION 2: Pending Delivery Confirmation ── */}
+            <div style={{ marginBottom: 28 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                <div style={{ width: 10, height: 10, borderRadius: "50%", background: pendingDelivery.length > 0 ? "#F97316" : "#D1D5DB", boxShadow: pendingDelivery.length > 0 ? "0 0 0 3px rgba(249,115,22,0.2)" : "none" }} />
+                <div style={{ fontSize: 16, fontWeight: 800, color: pendingDelivery.length > 0 ? "#9A3412" : "#6B7280" }}>Pending Delivery Confirmation — {pendingDelivery.length} Package{pendingDelivery.length !== 1 ? "s" : ""}</div>
+                {pendingDelivery.length > 0 && <span style={{ background: "#FFF7ED", color: "#9A3412", padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>ACTION REQUIRED</span>}
+              </div>
+              {pendingDelivery.length === 0 ? (
+                <Card style={{ textAlign: "center", padding: "20px", background: "#F9FAFB", border: "1px dashed #E5E7EB" }}>
+                  <div style={{ fontSize: 13, color: "#9CA3AF" }}>✅ No deliveries pending confirmation right now</div>
+                </Card>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 14 }}>
+                  {pendingDelivery.map(pkg => {
+                    const deliveryRider = riders.find(r => r.id === pkg.riderDeliveryId);
+                    const reportedLog = [...transitLogs].reverse().find(l => l.packageId === pkg.id && l.event === "DELIVERY_REPORTED");
+                    return (
+                      <Card key={pkg.id} style={{ border: "2px solid #FED7AA", background: "#FFF7ED" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                          <div>
+                            <div style={{ fontFamily: "monospace", fontWeight: 900, fontSize: 15, color: "#111827" }}>{pkg.trackingCode}</div>
+                            <div style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>Rider reported delivery — confirm to close</div>
+                          </div>
+                          <StatusBadge status={pkg.status} />
+                        </div>
+                        <div style={{ background: "#fff", borderRadius: 10, padding: "12px 14px", marginBottom: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                          {[
+                            ["Description",    pkg.description],
+                            ["Customer",       pkg.customerName],
+                            ["Delivered to",   pkg.deliveryAddress],
+                            ["Declared value", `KES ${pkg.declaredValue?.toLocaleString()}`],
+                          ].map(([label, val]) => (
+                            <div key={label} style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                              <span style={{ color: "#6B7280", fontWeight: 600 }}>{label}</span>
+                              <span style={{ fontWeight: 700, color: "#111827", textAlign: "right", maxWidth: 200 }}>{val}</span>
+                            </div>
+                          ))}
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                            <span style={{ color: "#6B7280", fontWeight: 600 }}>Delivery rider</span>
+                            <span style={{ fontWeight: 800, color: "#DC2626" }}>🏍️ {deliveryRider?.name || "Unknown"}</span>
+                          </div>
+                          {deliveryRider?.phone && (
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                              <span style={{ color: "#6B7280", fontWeight: 600 }}>Rider phone</span>
+                              <a href={`tel:${deliveryRider.phone}`} style={{ fontWeight: 700, color: "#0EA5E9", textDecoration: "none" }}>{deliveryRider.phone}</a>
+                            </div>
+                          )}
+                          {reportedLog && (
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                              <span style={{ color: "#6B7280", fontWeight: 600 }}>Reported at</span>
+                              <span style={{ fontWeight: 600, color: "#374151" }}>{new Date(reportedLog.createdAt).toLocaleString()}</span>
+                            </div>
+                          )}
+                        </div>
+                        {pkg.isHighValue && <div style={{ marginBottom: 10 }}><HighValueBadge /></div>}
+                        <ConfirmDeliveryBtn pkgId={pkg.id} onConfirmDelivery={onConfirmDelivery} />
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* ── SECTION 3: Ready to Dispatch ── */}
+            <div style={{ marginBottom: 28 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#6366F1" }} />
+                <div style={{ fontSize: 16, fontWeight: 800, color: "#111827" }}>Ready to Dispatch — {atHubUnassigned.length} Package{atHubUnassigned.length !== 1 ? "s" : ""}</div>
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", background: "#fff", borderRadius: 16, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+                  <thead>
+                    <tr style={{ background: "#F9FAFB" }}>
+                      {["Tracking","Description","Customer","Pickup","Drop-off Zone","Value","Flags","Assign Rider"].map(h => (
+                        <th key={h} style={{ padding: "12px 16px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: "1px solid #E5E7EB" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {atHubUnassigned.map((pkg, i) => (
+                      <tr key={pkg.id} style={{ borderBottom: i < atHubUnassigned.length - 1 ? "1px solid #F3F4F6" : "none", background: selectedPkg?.id === pkg.id ? "#FEF2F2" : "#fff" }}>
+                        <td style={{ padding: "12px 16px", fontFamily: "monospace", fontWeight: 700, fontSize: 13, color: "#111827" }}>{pkg.trackingCode}</td>
+                        <td style={{ padding: "12px 16px", fontSize: 13, color: "#374151" }}>{pkg.description}</td>
+                        <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 700, color: "#111827" }}>{pkg.customerName}</td>
+                        <td style={{ padding: "12px 16px", fontSize: 12, color: "#6B7280", maxWidth: 140 }}>{pkg.pickupAddress}</td>
+                        <td style={{ padding: "12px 16px" }}>
+                          <div style={{ marginBottom: 4 }}>{(() => { const t = TIER_BADGE[getZoneInfo(pkg.deliveryZone).tier]; return <span style={{ background: t.bg, color: t.color, padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 700 }}>{pkg.deliveryZone}</span>; })()}</div>
+                          <div style={{ fontSize: 11, color: "#9CA3AF" }}>{pkg.deliveryAddress}</div>
+                        </td>
+                        <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 700, color: "#111827" }}>KES {pkg.declaredValue?.toLocaleString()}</td>
+                        <td style={{ padding: "12px 16px" }}>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                            {pkg.isHighValue && <HighValueBadge />}
+                            {pkg.protectionFee > 0 && <span style={{ fontSize: 10, background: "#FEF3C7", color: "#7F1D1D", padding: "2px 6px", borderRadius: 10, fontWeight: 700 }}>PROTECTED</span>}
+                            {pkg.requestType === "pickup_request" && <span style={{ fontSize: 10, background: "#EDE9FE", color: "#7C3AED", padding: "2px 6px", borderRadius: 10, fontWeight: 700 }}>🛵 PICKUP</span>}
+                          </div>
+                        </td>
+                        <td style={{ padding: "12px 16px" }}>
+                          {selectedPkg?.id === pkg.id ? (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 180 }}>
+                              <select value={selectedRider} onChange={e => setSelectedRider(e.target.value)} style={{ padding: "6px 10px", border: "1.5px solid #E5E7EB", borderRadius: 8, fontSize: 13, fontFamily: "inherit" }}>
+                                <option value="">Select Rider...</option>
+                                {riders.filter(r => r.zone === pkg.deliveryZone).length > 0
+                                  ? riders.filter(r => r.zone === pkg.deliveryZone).map(r => <option key={r.id} value={r.id}>{r.name} — {r.zone}</option>)
+                                  : riders.map(r => <option key={r.id} value={r.id}>{r.name} ({r.zone})</option>)}
+                              </select>
+                              <div style={{ display: "flex", gap: 6 }}>
+                                <Btn onClick={() => handleDispatch(pkg)} variant="success" size="sm" disabled={!selectedRider || dispatching}>{dispatching ? "Saving…" : "🚀 Dispatch"}</Btn>
+                                <Btn onClick={() => { setSelectedPkg(null); setSelectedRider(""); }} variant="ghost" size="sm">Cancel</Btn>
+                              </div>
+                            </div>
+                          ) : (
+                            <Btn onClick={() => { setSelectedPkg(pkg); setSelectedRider(""); }} variant="primary" size="sm">Assign Rider →</Btn>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {atHubUnassigned.length === 0 && (
+                      <tr><td colSpan={8} style={{ padding: 32, textAlign: "center", color: "#9CA3AF" }}>All hub packages have been assigned</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* ── SECTION 4: Dispatched — Awaiting Rider Collection ── */}
+            {atHubDispatched.length > 0 && (
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#0EA5E9" }} />
+                  <div style={{ fontSize: 16, fontWeight: 800, color: "#111827" }}>Dispatched — Awaiting Rider Collection ({atHubDispatched.length})</div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+                  {atHubDispatched.map(pkg => {
+                    const deliveryRider = riders.find(r => r.id === pkg.riderDeliveryId);
+                    return (
+                      <Card key={pkg.id} style={{ border: "1.5px solid #BAE6FD", background: "#F0F9FF" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                          <div style={{ fontFamily: "monospace", fontWeight: 800, fontSize: 13, color: "#111827" }}>{pkg.trackingCode}</div>
+                          <StatusBadge status={pkg.status} />
+                        </div>
+                        <div style={{ fontSize: 13, color: "#374151", marginBottom: 6 }}>{pkg.description}</div>
+                        <div style={{ fontSize: 12, color: "#6B7280" }}>→ {pkg.deliveryAddress}</div>
+                        <div style={{ marginTop: 8, padding: "8px 10px", background: "#fff", borderRadius: 8, fontSize: 12 }}>
+                          <span style={{ color: "#6B7280" }}>Rider: </span>
+                          <span style={{ fontWeight: 700, color: "#0EA5E9" }}>🏍️ {deliveryRider?.name || "—"}</span>
+                          <span style={{ color: "#9CA3AF", marginLeft: 8 }}>({deliveryRider?.phone || ""})</span>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1141,7 +1407,218 @@ function AdminDashboard({ packages, riders, transitLogs, onDispatch, onAddRider,
             </div>
           </div>
         )}
-        {view === "logs" && (
+                {view === "requests" && (
+          <div>
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 20, fontWeight: 900, color: "#111827" }}>Incoming Requests</div>
+              <div style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>All orders — review customer, pickup, destination and assign riders accordingly</div>
+            </div>
+            {packages.length === 0 ? (
+              <Card style={{ textAlign: "center", padding: 48 }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#111827" }}>No requests yet</div>
+              </Card>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {[...packages].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map(pkg => {
+                  const collRider = riders.find(r => r.id === pkg.riderCollectionId);
+                  const delRider  = riders.find(r => r.id === pkg.riderDeliveryId);
+                  const tier      = TIER_BADGE[getZoneInfo(pkg.deliveryZone).tier];
+                  return (
+                    <Card key={pkg.id} style={{ border: "1px solid #F3F4F6" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, flex: "0 0 auto" }}>
+                          <div>
+                            <div style={{ fontFamily: "monospace", fontWeight: 800, fontSize: 15, color: "#DC2626" }}>{pkg.trackingCode}</div>
+                            <div style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>{new Date(pkg.createdAt).toLocaleString()}</div>
+                          </div>
+                          <StatusBadge status={pkg.status} />
+                          {pkg.isHighValue && <HighValueBadge />}
+                          {pkg.requestType === "pickup_request" && <span style={{ fontSize: 11, background: "#EDE9FE", color: "#7C3AED", padding: "2px 8px", borderRadius: 20, fontWeight: 700 }}>🛵 Pickup Req.</span>}
+                        </div>
+                        <div style={{ textAlign: "right", flex: "0 0 auto" }}>
+                          <div style={{ fontSize: 18, fontWeight: 900, color: "#DC2626" }}>KES {pkg.total}</div>
+                          {pkg.protectionFee > 0 && <div style={{ fontSize: 11, color: "#9CA3AF" }}>incl. KES {pkg.protectionFee} protection</div>}
+                        </div>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginTop: 14 }}>
+                        <div style={{ background: "#F9FAFB", borderRadius: 10, padding: "10px 12px" }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Customer</div>
+                          <div style={{ fontSize: 14, fontWeight: 800, color: "#111827" }}>{pkg.customerName}</div>
+                          {(() => { const cust = customers.find(cu => cu.id === pkg.customerId); return cust ? <div style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}><div>{cust.phone}</div><div style={{ fontSize: 11, color: "#9CA3AF" }}>{cust.email}</div></div> : null; })()}
+                        </div>
+                        <div style={{ background: "#F9FAFB", borderRadius: 10, padding: "10px 12px" }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Route</div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                            <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
+                              <span style={{ fontSize: 12 }}>📍</span>
+                              <div><div style={{ fontSize: 10, fontWeight: 700, color: "#6B7280", textTransform: "uppercase" }}>From</div><div style={{ fontSize: 12, fontWeight: 600, color: "#111827" }}>{pkg.pickupAddress}</div></div>
+                            </div>
+                            <div style={{ height: 1, background: "#E5E7EB" }} />
+                            <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
+                              <span style={{ fontSize: 12 }}>🏠</span>
+                              <div><div style={{ fontSize: 10, fontWeight: 700, color: "#6B7280", textTransform: "uppercase" }}>To</div><div style={{ fontSize: 12, fontWeight: 600, color: "#111827" }}>{pkg.deliveryAddress}</div></div>
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ background: "#F9FAFB", borderRadius: 10, padding: "10px 12px" }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Assignment</div>
+                          <div style={{ marginBottom: 6 }}><span style={{ background: tier.bg, color: tier.color, padding: "2px 10px", borderRadius: 20, fontSize: 12, fontWeight: 700 }}>{pkg.deliveryZone}</span></div>
+                          <div style={{ fontSize: 12, color: "#6B7280", marginTop: 4 }}><span style={{ fontWeight: 700, color: "#374151" }}>Collection: </span>{collRider ? <span style={{ color: "#DC2626", fontWeight: 700 }}>🏍️ {collRider.name}</span> : <span style={{ color: "#9CA3AF" }}>Unassigned</span>}</div>
+                          <div style={{ fontSize: 12, color: "#6B7280", marginTop: 3 }}><span style={{ fontWeight: 700, color: "#374151" }}>Delivery: </span>{delRider ? <span style={{ color: "#10B981", fontWeight: 700 }}>🏍️ {delRider.name}</span> : <span style={{ color: "#9CA3AF" }}>Unassigned</span>}</div>
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 12, marginTop: 12, paddingTop: 12, borderTop: "1px solid #F3F4F6", flexWrap: "wrap" }}>
+                        <span style={{ fontSize: 12, color: "#6B7280" }}>📦 <strong style={{ color: "#374151" }}>{pkg.description}</strong></span>
+                        <span style={{ fontSize: 12, color: "#6B7280" }}>Size: <strong style={{ color: "#374151", textTransform: "capitalize" }}>{pkg.size}</strong></span>
+                        <span style={{ fontSize: 12, color: "#6B7280" }}>Value: <strong style={{ color: "#374151" }}>KES {pkg.declaredValue?.toLocaleString()}</strong></span>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {view === "customers" && (
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: "#111827" }}>Customer Profiles</div>
+                <div style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>{customers.length} registered customers</div>
+              </div>
+            </div>
+            {customers.length === 0 ? (
+              <Card style={{ textAlign: "center", padding: 48 }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>👥</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#111827", marginBottom: 6 }}>No customers yet</div>
+                <div style={{ fontSize: 13, color: "#9CA3AF" }}>Customer accounts will appear here once they sign up.</div>
+              </Card>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
+                {customers.map(customer => {
+                  const custPkgs      = packages.filter(p => p.customerId === customer.id);
+                  const activePkgs    = custPkgs.filter(p => !["delivered","cancelled"].includes(p.status));
+                  const deliveredPkgs = custPkgs.filter(p => p.status === "delivered");
+                  const totalSpend    = custPkgs.reduce((s, p) => s + p.total, 0);
+                  const joinDate      = customer.createdAt ? new Date(customer.createdAt).toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric" }) : "—";
+                  return (
+                    <Card key={customer.id} style={{ border: "1px solid #F3F4F6" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
+                        <div style={{ width: 52, height: 52, borderRadius: "50%", background: "linear-gradient(135deg, #DC2626, #EF4444)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0, boxShadow: "0 4px 12px rgba(220,38,38,0.25)", color: "#fff", fontWeight: 800 }}>
+                          {customer.name ? customer.name.charAt(0).toUpperCase() : "?"}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 16, fontWeight: 800, color: "#111827", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{customer.name || "Unknown"}</div>
+                          <div style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>Customer since {joinDate}</div>
+                        </div>
+                        <span style={{ background: "#F0FDF4", color: "#16A34A", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", flexShrink: 0 }}>Active</span>
+                      </div>
+                      <div style={{ background: "#F9FAFB", borderRadius: 12, padding: "12px 14px", marginBottom: 14 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Contact Details</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                          <span>📞</span>
+                          <a href={"tel:" + customer.phone} style={{ fontSize: 14, fontWeight: 700, color: "#111827", textDecoration: "none" }}>{customer.phone || "—"}</a>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span>✉️</span>
+                          <span style={{ fontSize: 13, color: "#374151", wordBreak: "break-all" }}>{customer.email || "—"}</span>
+                        </div>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
+                        <div style={{ textAlign: "center", background: "#FEF2F2", borderRadius: 10, padding: "10px 4px" }}>
+                          <div style={{ fontSize: 20, fontWeight: 900, color: "#DC2626" }}>{custPkgs.length}</div>
+                          <div style={{ fontSize: 10, color: "#6B7280", fontWeight: 700, textTransform: "uppercase" }}>Total</div>
+                        </div>
+                        <div style={{ textAlign: "center", background: "#FEF3C7", borderRadius: 10, padding: "10px 4px" }}>
+                          <div style={{ fontSize: 20, fontWeight: 900, color: "#D97706" }}>{activePkgs.length}</div>
+                          <div style={{ fontSize: 10, color: "#6B7280", fontWeight: 700, textTransform: "uppercase" }}>Active</div>
+                        </div>
+                        <div style={{ textAlign: "center", background: "#ECFDF5", borderRadius: 10, padding: "10px 4px" }}>
+                          <div style={{ fontSize: 20, fontWeight: 900, color: "#10B981" }}>{deliveredPkgs.length}</div>
+                          <div style={{ fontSize: 10, color: "#6B7280", fontWeight: 700, textTransform: "uppercase" }}>Done</div>
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 12, borderTop: "1px solid #F3F4F6" }}>
+                        <span style={{ fontSize: 12, color: "#6B7280", fontWeight: 600 }}>Total Spend</span>
+                        <span style={{ fontSize: 16, fontWeight: 900, color: "#DC2626" }}>KES {totalSpend.toLocaleString()}</span>
+                      </div>
+                      {custPkgs.length > 0 && (() => {
+                        const latest = custPkgs[0];
+                        return (
+                          <div style={{ marginTop: 12, padding: "10px 12px", background: "#F9FAFB", borderRadius: 10, border: "1px solid #F3F4F6" }}>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Latest Order</div>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <span style={{ fontFamily: "monospace", fontSize: 12, fontWeight: 700, color: "#DC2626" }}>{latest.trackingCode}</span>
+                              <StatusBadge status={latest.status} />
+                            </div>
+                            <div style={{ fontSize: 12, color: "#6B7280", marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{latest.description} → {latest.deliveryZone}</div>
+                          </div>
+                        );
+                      })()}
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {view === "debug" && (
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 900, color: "#111827", marginBottom: 4 }}>🔧 Debug Panel</div>
+            <div style={{ fontSize: 13, color: "#6B7280", marginBottom: 16 }}>Live package statuses as received from Supabase. Use this to verify what the DB actually contains.</div>
+            <Card style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, fontFamily: "monospace" }}>
+                <thead>
+                  <tr style={{ background: "#F9FAFB" }}>
+                    {["Tracking Code","Status (raw)","riderCollectionId","riderDeliveryId","Filters match"].map(h => (
+                      <th key={h} style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: "#6B7280", borderBottom: "1px solid #E5E7EB", fontSize: 11, textTransform: "uppercase" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {packages.map(pkg => {
+                    const isPendingAccept   = pkg.status === "pending_warehouse";
+                    const isAtHub           = pkg.status === "at_warehouse";
+                    const isPendingDelivery = pkg.status === "pending_delivery";
+                    const isInTransit       = ["searching_rider","awaiting_collection","picked_up","pending_warehouse","at_warehouse","out_for_delivery","pending_delivery"].includes(pkg.status);
+                    const matchLabels = [
+                      isPendingAccept   && "PENDING ACCEPT",
+                      isAtHub           && (pkg.riderDeliveryId ? "AT HUB (dispatched)" : "AT HUB (unassigned)"),
+                      isPendingDelivery && "PENDING DELIVERY",
+                      isInTransit       && "IN TRANSIT",
+                    ].filter(Boolean).join(", ") || "—";
+                    return (
+                      <tr key={pkg.id} style={{ borderBottom: "1px solid #F3F4F6", background: (isPendingAccept || isPendingDelivery) ? "#FFF9C4" : "#fff" }}>
+                        <td style={{ padding: "8px 12px", fontWeight: 700, color: "#DC2626" }}>{pkg.trackingCode}</td>
+                        <td style={{ padding: "8px 12px" }}><span style={{ background: "#F3F4F6", padding: "2px 8px", borderRadius: 6, fontWeight: 700 }}>{pkg.status}</span></td>
+                        <td style={{ padding: "8px 12px", color: pkg.riderCollectionId ? "#059669" : "#9CA3AF" }}>{pkg.riderCollectionId ? pkg.riderCollectionId.slice(0,8)+"…" : "null"}</td>
+                        <td style={{ padding: "8px 12px", color: pkg.riderDeliveryId ? "#059669" : "#9CA3AF" }}>{pkg.riderDeliveryId ? pkg.riderDeliveryId.slice(0,8)+"…" : "null"}</td>
+                        <td style={{ padding: "8px 12px", color: "#374151", fontWeight: 600 }}>{matchLabels}</td>
+                      </tr>
+                    );
+                  })}
+                  {packages.length === 0 && (
+                    <tr><td colSpan={5} style={{ padding: 24, textAlign: "center", color: "#9CA3AF" }}>No packages loaded</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </Card>
+            <Card style={{ marginTop: 16, background: "#1F2937", color: "#D1D5DB", fontFamily: "monospace", fontSize: 12 }}>
+              <div style={{ fontWeight: 700, color: "#F9FAFB", marginBottom: 8 }}>Summary counts</div>
+              <div>pendingAcceptance (pending_warehouse): <strong style={{ color: "#FCD34D" }}>{pendingAcceptance.length}</strong></div>
+              <div>atHub (at_warehouse): <strong style={{ color: "#FCD34D" }}>{atHub.length}</strong> (unassigned: {atHubUnassigned.length}, dispatched: {atHubDispatched.length})</div>
+              <div>pendingDelivery (pending_delivery): <strong style={{ color: "#FCD34D" }}>{pendingDelivery.length}</strong></div>
+              <div>inTransit: <strong style={{ color: "#FCD34D" }}>{inTransit.length}</strong></div>
+              <div>delivered: <strong style={{ color: "#FCD34D" }}>{delivered.length}</strong></div>
+              <div>total packages: <strong style={{ color: "#FCD34D" }}>{packages.length}</strong></div>
+            </Card>
+          </div>
+        )}
+
+{view === "logs" && (
           <div>
             <div style={{ fontSize: 18, fontWeight: 600, color: "#111827", marginBottom: 16 }}>Chain of Custody Log</div>
             <Card>
@@ -1160,7 +1637,7 @@ function AdminDashboard({ packages, riders, transitLogs, onDispatch, onAddRider,
                       <tr key={log.id} style={{ borderBottom: "1px solid #F3F4F6" }}>
                         <td style={{ padding: "10px 12px", fontFamily: "monospace", fontSize: 12, fontWeight: 700, color: "#DC2626" }}>{pkg?.trackingCode || log.packageId.slice(0,8)}</td>
                         <td style={{ padding: "10px 12px" }}>
-                          <span style={{ background: "#F0FDF4", color: "#166534", padding: "2px 8px", borderRadius: 6, fontSize: 12, fontWeight: 700 }}>{EVENT_LABELS[log.event] || EVENT_LABELS[log.event?.toUpperCase()] || log.event?.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}</span>
+                          <span style={{ background: "#F0FDF4", color: "#166534", padding: "2px 8px", borderRadius: 6, fontSize: 12, fontWeight: 700 }}>{log.event.replace(/_/g, " ")}</span>
                         </td>
                         <td style={{ padding: "10px 12px", fontSize: 13, color: "#374151" }}>{log.actorName} <span style={{ fontSize: 11, color: "#9CA3AF" }}>({log.actorRole})</span></td>
                         <td style={{ padding: "10px 12px", fontSize: 12, color: "#6B7280" }}>{log.location}</td>
@@ -1247,11 +1724,6 @@ const dbPkgToApp = (p) => ({
   customerName:         p.customer_name,
   riderCollectionId:    p.rider_collection_id,
   riderDeliveryId:      p.rider_delivery_id,
-  riderCollectionName:  p.collection_rider?.name  || null,
-  riderCollectionPhone: p.collection_rider?.phone || null,
-  riderCollectionLicense: p.collection_rider?.license_number || null,
-  riderDeliveryName:    p.delivery_rider?.name    || null,
-  riderDeliveryPhone:   p.delivery_rider?.phone   || null,
   pickupAddress:        p.pickup_address,
   deliveryAddress:      p.delivery_address,
   deliveryZone:         p.delivery_zone,
@@ -1395,263 +1867,9 @@ function SignupScreen({ onBack }) {
 }
 
 // ============================================================
-// HOME LANDING PAGE
-// ============================================================
-function HomeLandingPage({ onSignup, onLogin }) {
-  const [form, setForm]       = useState({ name: "", email: "", phone: "", password: "", confirm: "" });
-  const [error, setError]     = useState("");
-  const [success, setSuccess] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [activeFeature, setActiveFeature] = useState(0);
-  const set = k => v => setForm(f => ({ ...f, [k]: v }));
-
-  const handleSignup = async () => {
-    setError(""); setSuccess("");
-    if (!form.name || !form.email || !form.phone || !form.password || !form.confirm)
-      return setError("Please fill in all fields.");
-    if (form.password.length < 6) return setError("Password must be at least 6 characters.");
-    if (form.password !== form.confirm) return setError("Passwords do not match.");
-    setLoading(true);
-    try {
-      const { error: signUpError } = await supabase.auth.signUp({
-        email: form.email.trim().toLowerCase(),
-        password: form.password,
-        options: { data: { name: form.name.trim(), phone: form.phone.trim(), role: "customer" } },
-      });
-      if (signUpError) throw signUpError;
-      setSuccess("Account created! Welcome to Baruk 🎉");
-    } catch (err) {
-      setError(err.message || "Signup failed. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const features = [
-    { icon: "🏍️", title: "Real-Time Tracking", desc: "Watch your package move across Nairobi live. Every handoff logged — from pickup to doorstep." },
-    { icon: "🛵", title: "Pickup Requests", desc: "Shop online, at a tailor, or a supplier? We collect from them and deliver straight to you." },
-    { icon: "🔐", title: "OTP-Secured Handoffs", desc: "High-value items get PIN-verified at every step. No package changes hands without confirmation." },
-    { icon: "🛡️", title: "Package Protection", desc: "Opt-in insurance for valuables. Full coverage, zero stress on items that matter most." },
-    { icon: "⚡", title: "Same-Day Delivery", desc: "From Westlands to Karen, Thika Road to Ngong — most deliveries done the same day." },
-    { icon: "📍", title: "Zone-Based Pricing", desc: "Transparent flat rates per zone. No surprises, no hidden fees — just fair delivery costs." },
-  ];
-
-  const steps = [
-    { n: "01", title: "Book in seconds", desc: "Fill in pickup, drop-off, and package details. Get an instant price quote.", color: "#DC2626" },
-    { n: "02", title: "Rider collects", desc: "A Baruk rider heads to your location. Track them in real-time on your dashboard.", color: "#F97316" },
-    { n: "03", title: "Hub verification", desc: "Package is logged at Baruk Central with a full custody record. Insured items confirmed.", color: "#8B5CF6" },
-    { n: "04", title: "Delivered to door", desc: "A delivery rider takes it the last mile. OTP handoff for high-value items.", color: "#10B981" },
-  ];
-
-  const inp = (placeholder, type, key, icon) => (
-    <div style={{ position: "relative", marginBottom: 12 }}>
-      <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", fontSize: 14, pointerEvents: "none", zIndex: 1 }}>{icon}</span>
-      <input
-        type={type} value={form[key]} onChange={e => set(key)(e.target.value)}
-        placeholder={placeholder}
-        style={{ width: "100%", padding: "13px 14px 13px 40px", background: "rgba(255,255,255,0.07)", border: "1.5px solid rgba(255,255,255,0.12)", borderRadius: 12, fontSize: 14, fontFamily: "inherit", boxSizing: "border-box", outline: "none", color: "#fff", transition: "border 0.2s" }}
-        onFocus={e => e.target.style.borderColor = "#DC2626"}
-        onBlur={e => e.target.style.borderColor = "rgba(255,255,255,0.12)"}
-      />
-    </div>
-  );
-
-  return (
-    <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", background: "#0A0A0A", color: "#fff", overflowX: "hidden" }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Sans:wght@400;500;600;700;800;900&display=swap');
-        .hero-title { font-family: 'Syne', sans-serif; }
-        @keyframes fadeUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes pulse-red { 0%,100% { box-shadow: 0 0 0 0 rgba(220,38,38,0.4); } 50% { box-shadow: 0 0 0 12px rgba(220,38,38,0); } }
-        @keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
-        .fade-up-1 { animation: fadeUp 0.6s ease forwards; }
-        .fade-up-2 { animation: fadeUp 0.6s 0.15s ease both; }
-        .fade-up-3 { animation: fadeUp 0.6s 0.3s ease both; }
-        .fade-up-4 { animation: fadeUp 0.6s 0.45s ease both; }
-        .cta-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(220,38,38,0.5) !important; }
-        .feature-card:hover { background: rgba(220,38,38,0.08) !important; border-color: rgba(220,38,38,0.3) !important; transform: translateY(-2px); }
-        .feature-card { transition: all 0.2s ease; }
-        input::placeholder { color: rgba(255,255,255,0.3); }
-      `}</style>
-
-      {/* ── NAV ── */}
-      <nav style={{ position: "sticky", top: 0, zIndex: 100, background: "rgba(10,10,10,0.85)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 34, height: 34, borderRadius: 10, background: "#DC2626", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, animation: "pulse-red 2.5s infinite" }}>🏍️</div>
-          <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 900, color: "#fff", letterSpacing: "-0.5px" }}>Baruk</span>
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={onLogin} style={{ padding: "8px 18px", background: "transparent", border: "1.5px solid rgba(255,255,255,0.15)", color: "#fff", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Sign In</button>
-          <button onClick={() => document.getElementById("signup-section").scrollIntoView({ behavior: "smooth" })} style={{ padding: "8px 18px", background: "#DC2626", border: "none", color: "#fff", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 4px 16px rgba(220,38,38,0.35)" }}>Get Started</button>
-        </div>
-      </nav>
-
-      {/* ── TICKER ── */}
-      <div style={{ background: "#DC2626", padding: "8px 0", overflow: "hidden", whiteSpace: "nowrap" }}>
-        <div style={{ display: "inline-flex", animation: "ticker 18s linear infinite", gap: 0 }}>
-          {[...Array(2)].map((_, i) => (
-            <span key={i} style={{ display: "inline-flex", gap: 0 }}>
-              {["🏍️ Same-Day Delivery across Nairobi", "🛵 Pickup Requests from any shop or supplier", "🔐 OTP-secured high-value handoffs", "📍 Real-time package tracking", "🛡️ Optional package protection", "⚡ Flat zone-based pricing"].map((t, j) => (
-                <span key={j} style={{ display: "inline-block", padding: "0 32px", fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", color: "rgba(255,255,255,0.9)" }}>{t} &nbsp;•</span>
-              ))}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {/* ── HERO ── */}
-      <section style={{ padding: "72px 24px 80px", maxWidth: 640, margin: "0 auto", textAlign: "center", position: "relative" }}>
-        {/* Background glow */}
-        <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 400, height: 400, background: "radial-gradient(circle, rgba(220,38,38,0.12) 0%, transparent 70%)", pointerEvents: "none" }} />
-
-        <div className="fade-up-1" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(220,38,38,0.12)", border: "1px solid rgba(220,38,38,0.25)", borderRadius: 100, padding: "6px 16px", marginBottom: 24 }}>
-          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#DC2626", display: "inline-block", animation: "pulse-red 1.5s infinite" }} />
-          <span style={{ fontSize: 12, fontWeight: 700, color: "#FCA5A5", letterSpacing: "0.06em", textTransform: "uppercase" }}>Live in Nairobi</span>
-        </div>
-
-        <h1 className="hero-title fade-up-2" style={{ fontSize: "clamp(40px, 10vw, 68px)", fontWeight: 900, lineHeight: 1.05, margin: "0 0 20px", letterSpacing: "-2px" }}>
-          Nairobi's fastest<br />
-          <span style={{ color: "#DC2626", position: "relative" }}>delivery network</span>
-        </h1>
-
-        <p className="fade-up-3" style={{ fontSize: 17, color: "rgba(255,255,255,0.55)", lineHeight: 1.65, margin: "0 0 36px", maxWidth: 480, marginLeft: "auto", marginRight: "auto" }}>
-          Send parcels. Request pickups. Track every handoff in real time — from the moment a rider accepts to the second your package lands at the door.
-        </p>
-
-        <div className="fade-up-4" style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-          <button className="cta-btn" onClick={() => document.getElementById("signup-section").scrollIntoView({ behavior: "smooth" })}
-            style={{ padding: "14px 32px", background: "#DC2626", color: "#fff", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 8px 24px rgba(220,38,38,0.35)", transition: "all 0.2s" }}>
-            Start Sending — Free
-          </button>
-          <button onClick={onLogin}
-            style={{ padding: "14px 28px", background: "rgba(255,255,255,0.06)", color: "#fff", border: "1.5px solid rgba(255,255,255,0.1)", borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-            Sign In →
-          </button>
-        </div>
-
-        {/* Social proof */}
-        <div style={{ marginTop: 48, display: "flex", justifyContent: "center", gap: 32, flexWrap: "wrap" }}>
-          {[["500+", "Deliveries Done"], ["4.9★", "Customer Rating"], ["< 4hr", "Avg Delivery Time"]].map(([n, l]) => (
-            <div key={l} style={{ textAlign: "center" }}>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 26, fontWeight: 900, color: "#fff" }}>{n}</div>
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontWeight: 600, marginTop: 2 }}>{l}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── FEATURES ── */}
-      <section style={{ padding: "72px 24px", background: "rgba(255,255,255,0.02)", borderTop: "1px solid rgba(255,255,255,0.05)", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-        <div style={{ maxWidth: 640, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 48 }}>
-            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.12em", color: "#DC2626", textTransform: "uppercase", marginBottom: 12 }}>Why Baruk</div>
-            <h2 className="hero-title" style={{ fontSize: "clamp(28px, 7vw, 44px)", fontWeight: 900, margin: 0, letterSpacing: "-1px" }}>Built different.<br />Built for Nairobi.</h2>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            {features.map((f, i) => (
-              <div key={i} className="feature-card" style={{ background: "rgba(255,255,255,0.04)", border: "1.5px solid rgba(255,255,255,0.07)", borderRadius: 16, padding: "20px 18px", cursor: "default" }}>
-                <div style={{ fontSize: 28, marginBottom: 10 }}>{f.icon}</div>
-                <div style={{ fontSize: 14, fontWeight: 800, color: "#fff", marginBottom: 6, lineHeight: 1.3 }}>{f.title}</div>
-                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", lineHeight: 1.6 }}>{f.desc}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── HOW IT WORKS ── */}
-      <section style={{ padding: "72px 24px" }}>
-        <div style={{ maxWidth: 640, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 48 }}>
-            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.12em", color: "#DC2626", textTransform: "uppercase", marginBottom: 12 }}>The Process</div>
-            <h2 className="hero-title" style={{ fontSize: "clamp(28px, 7vw, 44px)", fontWeight: 900, margin: 0, letterSpacing: "-1px" }}>From booking<br />to doorstep.</h2>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            {steps.map((s, i) => (
-              <div key={i} style={{ display: "flex", gap: 20, alignItems: "flex-start", padding: "20px 0", borderBottom: i < steps.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 36, fontWeight: 900, color: s.color, lineHeight: 1, flexShrink: 0, minWidth: 52 }}>{s.n}</div>
-                <div>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: "#fff", marginBottom: 4 }}>{s.title}</div>
-                  <div style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", lineHeight: 1.6 }}>{s.desc}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── PICKUP CALLOUT ── */}
-      <section style={{ padding: "0 24px 72px" }}>
-        <div style={{ maxWidth: 640, margin: "0 auto" }}>
-          <div style={{ background: "linear-gradient(135deg, rgba(139,92,246,0.15) 0%, rgba(220,38,38,0.1) 100%)", border: "1.5px solid rgba(139,92,246,0.25)", borderRadius: 20, padding: "28px 24px" }}>
-            <div style={{ fontSize: 32, marginBottom: 12 }}>🛵</div>
-            <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 900, margin: "0 0 10px", letterSpacing: "-0.5px" }}>Pickup Requests — a Baruk exclusive</h3>
-            <p style={{ fontSize: 14, color: "rgba(255,255,255,0.55)", lineHeight: 1.7, margin: "0 0 20px" }}>
-              Ordered something from a tailor in Westlands? Bought fabric from a supplier in Gikomba? Waiting on a delivery from a shop that doesn't deliver?<br /><br />
-              <strong style={{ color: "#C4B5FD" }}>Tell us where to collect, and we'll bring it straight to you.</strong> We pay a visit, pick it up, and it's at your door the same day.
-            </p>
-            <button className="cta-btn" onClick={() => document.getElementById("signup-section").scrollIntoView({ behavior: "smooth" })}
-              style={{ padding: "12px 24px", background: "#8B5CF6", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 4px 20px rgba(139,92,246,0.35)", transition: "all 0.2s" }}>
-              Try Pickup Requests →
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* ── SIGNUP FORM ── */}
-      <section id="signup-section" style={{ padding: "72px 24px 80px", background: "rgba(220,38,38,0.04)", borderTop: "1px solid rgba(220,38,38,0.15)" }}>
-        <div style={{ maxWidth: 440, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 36 }}>
-            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.12em", color: "#DC2626", textTransform: "uppercase", marginBottom: 12 }}>Join Baruk</div>
-            <h2 className="hero-title" style={{ fontSize: "clamp(28px, 7vw, 38px)", fontWeight: 900, margin: "0 0 10px", letterSpacing: "-1px" }}>Start delivering today.</h2>
-            <p style={{ fontSize: 14, color: "rgba(255,255,255,0.45)", margin: 0 }}>Free account. No commitments. Just fast, tracked deliveries.</p>
-          </div>
-
-          <div style={{ background: "rgba(255,255,255,0.04)", border: "1.5px solid rgba(255,255,255,0.08)", borderRadius: 20, padding: "28px 24px" }}>
-            {inp("Full Name", "text", "name", "👤")}
-            {inp("Email Address", "email", "email", "✉️")}
-            {inp("Phone Number", "tel", "phone", "📞")}
-            {inp("Password (min 6 chars)", "password", "password", "🔒")}
-            {inp("Confirm Password", "password", "confirm", "🔒")}
-
-            {error && <div style={{ background: "rgba(220,38,38,0.15)", border: "1px solid rgba(220,38,38,0.3)", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#FCA5A5", fontWeight: 600, marginBottom: 12 }}>⚠️ {error}</div>}
-            {success && <div style={{ background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.3)", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#6EE7B7", fontWeight: 600, marginBottom: 12 }}>✅ {success}</div>}
-
-            <button className="cta-btn" onClick={handleSignup} disabled={loading || !!success}
-              style={{ width: "100%", padding: "14px", background: loading || success ? "rgba(220,38,38,0.4)" : "#DC2626", color: "#fff", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 800, cursor: loading || success ? "not-allowed" : "pointer", fontFamily: "inherit", boxShadow: "0 8px 24px rgba(220,38,38,0.3)", transition: "all 0.2s", marginTop: 4 }}>
-              {loading ? "Creating account..." : success ? "You're in! 🎉" : "Create Free Account →"}
-            </button>
-
-            <div style={{ textAlign: "center", marginTop: 18, fontSize: 13, color: "rgba(255,255,255,0.35)" }}>
-              Already have an account?{" "}
-              <button onClick={onLogin} style={{ background: "none", border: "none", color: "#FCA5A5", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>Sign In</button>
-            </div>
-          </div>
-
-          <div style={{ marginTop: 20, padding: "14px 16px", background: "rgba(255,255,255,0.03)", borderRadius: 12, border: "1px solid rgba(255,255,255,0.06)" }}>
-            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", lineHeight: 1.7 }}>
-              🏍️ <strong style={{ color: "rgba(255,255,255,0.6)" }}>Riders:</strong> Your account is created by the Hub Admin. Contact your hub manager for login credentials.
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── FOOTER ── */}
-      <footer style={{ padding: "28px 24px", borderTop: "1px solid rgba(255,255,255,0.06)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 26, height: 26, borderRadius: 7, background: "#DC2626", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 }}>🏍️</div>
-          <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 900, color: "rgba(255,255,255,0.7)" }}>Baruk</span>
-        </div>
-        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.2)" }}>Fast. Reliable. Trackable. — Nairobi</div>
-      </footer>
-    </div>
-  );
-}
-
-// ============================================================
 // LOGIN SCREEN
 // ============================================================
-function LoginScreen({ onGoSignup, onGoHome }) {
+function LoginScreen({ onGoSignup }) {
   const [email, setEmail]               = useState("");
   const [password, setPassword]         = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -1677,7 +1895,6 @@ function LoginScreen({ onGoSignup, onGoHome }) {
   return (
     <div style={{ minHeight: "100dvh", background: "#F9FAFB", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', system-ui, sans-serif", padding: 20 }}>
       <div style={{ width: "100%", maxWidth: 420 }}>
-        {onGoHome && <button onClick={onGoHome} style={{ background: "none", border: "none", color: "#DC2626", fontWeight: 700, fontSize: 13, cursor: "pointer", marginBottom: 16, fontFamily: "inherit", padding: 0 }}>← Back to Home</button>}
         <AuthLogo />
         <div style={{ background: "#fff", borderRadius: 20, padding: 28, boxShadow: "0 4px 32px rgba(0,0,0,0.08)" }}>
           <div style={{ fontSize: 22, fontWeight: 900, color: "#111827", marginBottom: 4 }}>Welcome back</div>
@@ -1855,7 +2072,7 @@ function InstallBanner() {
 // ============================================================
 export default function App() {
   const [user, setUser]         = useState(null);
-  const [authView, setAuthView] = useState("home");
+  const [authView, setAuthView] = useState("login");
   const [appLoading, setAppLoading] = useState(true);
   const [packages, setPackages] = useState([]);
   const [logs, setLogs]         = useState([]);
@@ -1874,8 +2091,7 @@ export default function App() {
 
   // ── Fetch initial data ──
   const loadPackages = useCallback(async () => {
-    const selectQuery = "*,collection_rider:profiles!rider_collection_id(name,phone,license_number),delivery_rider:profiles!rider_delivery_id(name,phone)";
-    const { data } = await supabase.from("packages").select(selectQuery).order("created_at", { ascending: false });
+    const { data } = await supabase.from("packages").select("*").order("created_at", { ascending: false });
     if (data) setPackages(data.map(dbPkgToApp));
   }, []);
 
@@ -1887,6 +2103,12 @@ export default function App() {
   const loadRiders = useCallback(async () => {
     const { data } = await supabase.from("profiles").select("*").eq("role", "rider");
     if (data) setRiders(data.map(p => ({ id: p.id, name: p.name, phone: p.phone, zone: p.home_zone, licenseNumber: p.license_number, role: "rider" })));
+  }, []);
+
+  const [customers, setCustomers] = useState([]);
+  const loadCustomers = useCallback(async () => {
+    const { data } = await supabase.from("profiles").select("*").eq("role", "customer");
+    if (data) setCustomers(data.map(p => ({ id: p.id, name: p.name, phone: p.phone, email: p.email, role: "customer", createdAt: p.created_at })));
   }, []);
 
   // ── Auth state listener ──
@@ -1911,6 +2133,7 @@ export default function App() {
     loadPackages();
     loadLogs();
     loadRiders();
+    loadCustomers();
 
     // Realtime subscriptions
     const channel = supabase.channel("baruk-realtime")
@@ -1939,8 +2162,6 @@ export default function App() {
 
   // ── Update package in DB ──
   const updatePkg = async (id, updates) => {
-    // Optimistic local update — instant UI response
-    setPackages(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
     // Convert camelCase app fields back to snake_case for DB
     const dbUpdates = {};
     if (updates.status               !== undefined) dbUpdates.status                    = updates.status;
@@ -1948,9 +2169,8 @@ export default function App() {
     if (updates.riderDeliveryId      !== undefined) dbUpdates.rider_delivery_id          = updates.riderDeliveryId;
     if (updates.otpWarehouseVerified !== undefined) dbUpdates.otp_warehouse_verified     = updates.otpWarehouseVerified;
     if (updates.otpDeliveryVerified  !== undefined) dbUpdates.otp_delivery_verified      = updates.otpDeliveryVerified;
-    const { error } = await supabase.from("packages").update(dbUpdates).eq("id", id);
-    // On error, re-sync from DB to recover correct state
-    if (error) loadPackages();
+    await supabase.from("packages").update(dbUpdates).eq("id", id);
+    // Realtime will trigger loadPackages() automatically
   };
 
   // ── Create new package ──
@@ -1989,30 +2209,41 @@ export default function App() {
   // ── Rider actions ──
   const onAcceptCollection = async (pkgId, riderId) => {
     const pkg = packages.find(p => p.id === pkgId);
-    await updatePkg(pkgId, { riderCollectionId: riderId, status: "rider_accepted_collection" });
-    await addLog(pkgId, riderId, "rider", user.name, "RIDER_ACCEPTED_COLLECTION", pkg?.pickupAddress, "Rider accepted — heading to collect");
+    await updatePkg(pkgId, { riderCollectionId: riderId, status: "awaiting_collection" });
+    await addLog(pkgId, user.id, "rider", user.name, "ACCEPTED_ORDER", pkg?.pickupAddress, `${user.name} accepted — heading to collect`);
   };
 
-  const onConfirmCollected = async (pkgId) => {
+  const onConfirmCollection = async (pkgId) => {
     const pkg = packages.find(p => p.id === pkgId);
     await updatePkg(pkgId, { status: "picked_up" });
-    await addLog(pkgId, user.id, "rider", user.name, "PACKAGE_COLLECTED", pkg?.pickupAddress, "Package collected");
+    await addLog(pkgId, user.id, "rider", user.name, "COLLECTED_FROM_CUSTOMER", pkg?.pickupAddress, "Package physically collected from sender");
   };
 
   const onMarkAtWarehouse = async (pkgId) => {
+    await updatePkg(pkgId, { status: "pending_warehouse" });
+    await addLog(pkgId, user.id, "rider", user.name, "ARRIVED_AT_WAREHOUSE", "Baruk Central, CBD", "Awaiting warehouse acceptance");
+  };
+
+  const onAcceptAtWarehouse = async (pkgId) => {
     await updatePkg(pkgId, { status: "at_warehouse" });
-    await addLog(pkgId, user.id, "rider", user.name, "ARRIVED_AT_WAREHOUSE", "Baruk Central, CBD");
+    await addLog(pkgId, user.id, "admin", user.name, "WAREHOUSE_ACCEPTED", "Baruk Central, CBD", "Condition verified — package accepted at hub");
+  };
+
+  const onCollectedFromWarehouse = async (pkgId) => {
+    await updatePkg(pkgId, { status: "out_for_delivery" });
+    await addLog(pkgId, user.id, "rider", user.name, "COLLECTED_FROM_WAREHOUSE", "Baruk Central, CBD", "Package collected from hub — heading to customer");
   };
 
   const onDispatch = async (pkgId, riderId) => {
     const rider = riders.find(r => r.id === riderId);
-    await updatePkg(pkgId, { riderDeliveryId: riderId, status: "at_warehouse" });
+    await updatePkg(pkgId, { riderDeliveryId: riderId, status: "out_for_delivery" });
     await addLog(pkgId, user.id, "admin", user.name, "DISPATCHED_TO_RIDER", "Baruk Central, CBD", `Assigned to ${rider?.name}`);
+    await addLog(pkgId, riderId, "rider", rider?.name, "OUT_FOR_DELIVERY", "Baruk Central, CBD");
   };
 
-  const onAcceptDelivery = async (pkgId, riderId) => {
+  const onAcceptDelivery = async (pkgId) => {
     await updatePkg(pkgId, { status: "out_for_delivery" });
-    await addLog(pkgId, riderId, "rider", user.name, "ACCEPTED_DELIVERY_JOB", "Baruk Central, CBD", "Rider collected from hub — heading to customer");
+    await addLog(pkgId, user.id, "rider", user.name, "ACCEPTED_DELIVERY_JOB", "Baruk Central, CBD", "Rider accepted delivery job — heading out");
   };
 
   const onVerifyOTP = async (pkgId, type) => {
@@ -2028,8 +2259,14 @@ export default function App() {
 
   const onMarkDelivered = async (pkgId) => {
     const pkg = packages.find(p => p.id === pkgId);
+    await updatePkg(pkgId, { status: "pending_delivery" });
+    await addLog(pkgId, user.id, "rider", user.name, "DELIVERY_REPORTED", pkg?.deliveryAddress || "Customer address", "Rider reports package delivered — awaiting admin confirmation");
+  };
+
+  const onConfirmDelivery = async (pkgId) => {
+    const pkg = packages.find(p => p.id === pkgId);
     await updatePkg(pkgId, { status: "delivered" });
-    await addLog(pkgId, user.id, "rider", user.name, "DELIVERED", pkg?.deliveryAddress, "Package delivered successfully");
+    await addLog(pkgId, user.id, "admin", user.name, "DELIVERY_CONFIRMED", pkg?.deliveryAddress || "Customer address", "Delivery confirmed by admin");
   };
 
   // ── Admin creates rider account ──
@@ -2058,9 +2295,8 @@ export default function App() {
   if (appLoading) return <LoadingScreen />;
 
   if (!user) {
-    if (authView === "home")   return <><HomeLandingPage onSignup={() => setAuthView("signup")} onLogin={() => setAuthView("login")} /><InstallBanner /></>;
-    if (authView === "signup") return <><SignupScreen onBack={() => setAuthView("home")} /><InstallBanner /></>;
-    return <><LoginScreen onGoSignup={() => setAuthView("signup")} onGoHome={() => setAuthView("home")} /><InstallBanner /></>;
+    if (authView === "signup") return <><SignupScreen onBack={() => setAuthView("login")} /><InstallBanner /></>;
+    return <><LoginScreen onGoSignup={() => setAuthView("signup")} /><InstallBanner /></>;
   }
 
   const TopBar = () => (
@@ -2081,8 +2317,8 @@ export default function App() {
     <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", background: "#F1F5F9", minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
       <TopBar />
       {user.role === "customer" && <CustomerApp packages={packages.filter(p => p.customerId === user.id)} onCreatePackage={onCreatePackage} transitLogs={logs} />}
-      {user.role === "rider"    && <RiderApp packages={packages} onAcceptCollection={onAcceptCollection} onConfirmCollected={onConfirmCollected} onMarkAtWarehouse={onMarkAtWarehouse} onAcceptDelivery={onAcceptDelivery} onVerifyOTP={onVerifyOTP} onMarkDelivered={onMarkDelivered} transitLogs={logs} currentRider={user} />}
-      {user.role === "admin"    && <AdminDashboard packages={packages} riders={riders} transitLogs={logs} onDispatch={onDispatch} onAddRider={onAddRider} accounts={[...riders, user]} />}
+      {user.role === "rider"    && <RiderApp packages={packages} onAcceptCollection={onAcceptCollection} onConfirmCollection={onConfirmCollection} onMarkAtWarehouse={onMarkAtWarehouse} onCollectedFromWarehouse={onCollectedFromWarehouse} onAcceptDelivery={onAcceptDelivery} onVerifyOTP={onVerifyOTP} onMarkDelivered={onMarkDelivered} transitLogs={logs} currentRider={user} customers={customers} />}
+      {user.role === "admin"    && <AdminDashboard packages={packages} riders={riders} customers={customers} transitLogs={logs} onDispatch={onDispatch} onAcceptAtWarehouse={onAcceptAtWarehouse} onConfirmDelivery={onConfirmDelivery} onAddRider={onAddRider} accounts={[...riders, user]} onRefresh={loadPackages} />}
       <InstallBanner />
     </div>
   );
