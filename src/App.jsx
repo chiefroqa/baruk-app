@@ -751,16 +751,21 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
 
                     {/* Rider preview pill — visible even when collapsed */}
                     {hasCollectionRider && pkg.status !== "searching_rider" && (
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, background: "#FEF2F2", borderRadius: 8, padding: "5px 10px" }}>
-                        <span style={{ fontSize: 13 }}>🏍️</span>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: "#DC2626" }}>
-                          {pkg.riderCollectionName || "Rider assigned"}
-                        </span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 10, padding: "8px 12px" }}>
+                        <span style={{ fontSize: 16, flexShrink: 0 }}>🏍️</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 800, color: "#DC2626", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {pkg.riderCollectionName || "Rider assigned"}
+                          </div>
+                          {pkg.riderCollectionLicense && (
+                            <div style={{ fontSize: 11, color: "#6B7280", fontWeight: 600, marginTop: 1 }}>🪪 {pkg.riderCollectionLicense}</div>
+                          )}
+                        </div>
                         {pkg.riderCollectionPhone && (
                           <a
                             href={"tel:" + pkg.riderCollectionPhone}
                             onClick={e => e.stopPropagation()}
-                            style={{ marginLeft: "auto", background: "#DC2626", color: "#fff", padding: "3px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700, textDecoration: "none" }}
+                            style={{ flexShrink: 0, background: "#DC2626", color: "#fff", padding: "5px 12px", borderRadius: 7, fontSize: 12, fontWeight: 700, textDecoration: "none" }}
                           >📞 Call</a>
                         )}
                       </div>
@@ -1895,6 +1900,152 @@ const dbLogToApp = (l) => ({
 });
 
 // ============================================================
+// HOME PAGE
+// ============================================================
+function HomePage({ onSignup, onLogin }) {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setTick(n => n + 1), 40);
+    return () => clearInterval(t);
+  }, []);
+
+  const tickerItems = [
+    "🛵 Pickup Requests from any shop or supplier",
+    "📦 OTP-verified handoffs",
+    "📍 Live tracking every step",
+    "💰 KES 200 from CBD",
+    "🗺️ 67 Nairobi zones covered",
+    "⚡ Same-day delivery",
+  ];
+  const tickerText = tickerItems.join("   •   ") + "   •   " + tickerItems.join("   •   ");
+
+  return (
+    <div style={{ minHeight: "100dvh", background: "#0A0A0A", color: "#fff", fontFamily: "'DM Sans', system-ui, sans-serif", overflowX: "hidden" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,700;0,900;1,900&display=swap');
+        @keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+        .hp-fadein { animation: fadeUp 0.7s ease both; }
+        .hp-fadein-2 { animation: fadeUp 0.7s 0.15s ease both; }
+        .hp-fadein-3 { animation: fadeUp 0.7s 0.3s ease both; }
+        .hp-fadein-4 { animation: fadeUp 0.7s 0.45s ease both; }
+        .hp-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(220,38,38,0.5) !important; }
+        .hp-btn-secondary:hover { background: #1a1a1a !important; }
+      `}</style>
+
+      {/* NAV */}
+      <nav style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", position: "sticky", top: 0, background: "rgba(10,10,10,0.95)", backdropFilter: "blur(10px)", zIndex: 100, borderBottom: "1px solid #1a1a1a" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 38, height: 38, borderRadius: 10, background: "#DC2626", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, boxShadow: "0 4px 14px rgba(220,38,38,0.4)" }}>🏍️</div>
+          <span style={{ fontSize: 22, fontWeight: 900, letterSpacing: "-0.5px" }}>Baruk</span>
+        </div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={onLogin} className="hp-btn-secondary"
+            style={{ padding: "9px 20px", border: "1.5px solid #333", borderRadius: 10, background: "transparent", color: "#D1D5DB", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s" }}>
+            Sign In
+          </button>
+          <button onClick={onSignup} className="hp-btn-primary"
+            style={{ padding: "9px 20px", border: "none", borderRadius: 10, background: "#DC2626", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s", boxShadow: "0 4px 16px rgba(220,38,38,0.35)" }}>
+            Get Started
+          </button>
+        </div>
+      </nav>
+
+      {/* TICKER */}
+      <div style={{ background: "#DC2626", padding: "10px 0", overflow: "hidden", whiteSpace: "nowrap" }}>
+        <div style={{ display: "inline-block", animation: "ticker 28s linear infinite", whiteSpace: "nowrap" }}>
+          {[...Array(2)].map((_, i) => (
+            <span key={i} style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: "#fff" }}>
+              {tickerItems.map((item, j) => (
+                <span key={j}>{item}<span style={{ margin: "0 20px", opacity: 0.6 }}>•</span></span>
+              ))}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* HERO */}
+      <div style={{ padding: "52px 24px 40px", textAlign: "center" }}>
+        {/* Live badge */}
+        <div className="hp-fadein" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#1a1a1a", border: "1px solid #2a2a2a", borderRadius: 100, padding: "6px 16px", marginBottom: 28 }}>
+          <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#22C55E", boxShadow: "0 0 0 3px rgba(34,197,94,0.3)" }} />
+          <span style={{ fontSize: 12, fontWeight: 700, color: "#9CA3AF", letterSpacing: "0.1em" }}>LIVE IN NAIROBI</span>
+        </div>
+
+        {/* Headline */}
+        <h1 className="hp-fadein-2" style={{ fontSize: "clamp(44px, 12vw, 72px)", fontWeight: 900, lineHeight: 1.0, margin: "0 0 24px", letterSpacing: "-2px" }}>
+          Nairobi's<br />
+          fastest<br />
+          <span style={{ color: "#DC2626", fontStyle: "italic" }}>delivery<br />network</span>
+        </h1>
+
+        {/* Subline */}
+        <p className="hp-fadein-3" style={{ fontSize: 16, color: "#9CA3AF", lineHeight: 1.7, margin: "0 0 36px", maxWidth: 340, marginLeft: "auto", marginRight: "auto" }}>
+          Send parcels. Request pickups. Track every handoff in real time — from the moment a rider accepts to the second your package lands at the door.
+        </p>
+
+        {/* CTA buttons */}
+        <div className="hp-fadein-4" style={{ display: "flex", gap: 12, justifyContent: "center", marginBottom: 48, flexWrap: "wrap" }}>
+          <button onClick={onSignup} className="hp-btn-primary"
+            style={{ padding: "15px 28px", border: "none", borderRadius: 14, background: "#DC2626", color: "#fff", fontSize: 16, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s", boxShadow: "0 4px 20px rgba(220,38,38,0.4)", flex: "1 1 160px", maxWidth: 220 }}>
+            Start Sending — Free
+          </button>
+          <button onClick={onLogin} className="hp-btn-secondary"
+            style={{ padding: "15px 28px", border: "1.5px solid #2a2a2a", borderRadius: 14, background: "#111", color: "#D1D5DB", fontSize: 16, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s", flex: "1 1 120px", maxWidth: 180 }}>
+            Sign In →
+          </button>
+        </div>
+
+        {/* Stats */}
+        <div className="hp-fadein-4" style={{ display: "flex", justifyContent: "center", gap: 32, flexWrap: "wrap" }}>
+          {[
+            { val: "500+",  label: "Deliveries Done" },
+            { val: "4.9★",  label: "Customer Rating" },
+            { val: "< 4hr", label: "Avg Delivery Time" },
+          ].map(({ val, label }) => (
+            <div key={label} style={{ textAlign: "center" }}>
+              <div style={{ fontSize: "clamp(28px, 7vw, 40px)", fontWeight: 900, color: "#fff", letterSpacing: "-1px", lineHeight: 1 }}>{val}</div>
+              <div style={{ fontSize: 12, color: "#6B7280", fontWeight: 600, marginTop: 4 }}>{label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* HOW IT WORKS */}
+      <div style={{ padding: "0 24px 48px" }}>
+        <div style={{ background: "#111", borderRadius: 20, padding: "24px 20px", border: "1px solid #1e1e1e" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#DC2626", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 20, textAlign: "center" }}>How it works</div>
+          {[
+            { icon: "📦", step: "Book",    desc: "Fill in pickup & delivery details, pay via M-Pesa" },
+            { icon: "🏍️", step: "Collect", desc: "A verified rider picks up — you see their name, phone & reg no." },
+            { icon: "🚀", step: "Deliver", desc: "Real-time tracking to your door. OTP verified handoff." },
+          ].map(({ icon, step, desc }, i) => (
+            <div key={step} style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: i < 2 ? 20 : 0 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: "#1a1a1a", border: "1px solid #2a2a2a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>{icon}</div>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: "#fff", marginBottom: 3 }}>{step}</div>
+                <div style={{ fontSize: 13, color: "#6B7280", lineHeight: 1.5 }}>{desc}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* FOOTER CTA */}
+      <div style={{ padding: "0 24px 40px", textAlign: "center" }}>
+        <button onClick={onSignup} className="hp-btn-primary"
+          style={{ width: "100%", maxWidth: 400, padding: "16px", border: "none", borderRadius: 14, background: "#DC2626", color: "#fff", fontSize: 16, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s", boxShadow: "0 4px 20px rgba(220,38,38,0.4)", display: "block", margin: "0 auto" }}>
+          Create Free Account →
+        </button>
+        <div style={{ marginTop: 16, fontSize: 12, color: "#4B5563" }}>
+          🏍️ Riders: accounts are created by the hub admin — contact <a href="tel:0107129273" style={{ color: "#DC2626", textDecoration: "none", fontWeight: 700 }}>0107129273</a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
 // SHARED AUTH UI (reused by Login + Signup)
 // ============================================================
 const AuthInput = ({ label, value, onChange, type = "text", placeholder, icon }) => (
@@ -2005,7 +2156,7 @@ function SignupScreen({ onBack }) {
 // ============================================================
 // LOGIN SCREEN
 // ============================================================
-function LoginScreen({ onGoSignup }) {
+function LoginScreen({ onGoSignup, onBack }) {
   const [email, setEmail]               = useState("");
   const [password, setPassword]         = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -2208,7 +2359,7 @@ function InstallBanner() {
 // ============================================================
 export default function App() {
   const [user, setUser]         = useState(null);
-  const [authView, setAuthView] = useState("login");
+  const [authView, setAuthView] = useState("home");
   const [appLoading, setAppLoading] = useState(true);
   const [packages, setPackages] = useState([]);
   const [logs, setLogs]         = useState([]);
@@ -2462,8 +2613,9 @@ export default function App() {
   if (appLoading) return <LoadingScreen />;
 
   if (!user) {
-    if (authView === "signup") return <><SignupScreen onBack={() => setAuthView("login")} /><InstallBanner /></>;
-    return <><LoginScreen onGoSignup={() => setAuthView("signup")} /><InstallBanner /></>;
+    if (authView === "signup") return <><SignupScreen onBack={() => setAuthView("home")} /><InstallBanner /></>;
+    if (authView === "login")  return <><LoginScreen onGoSignup={() => setAuthView("home")} onBack={() => setAuthView("home")} /><InstallBanner /></>;
+    return <><HomePage onSignup={() => setAuthView("signup")} onLogin={() => setAuthView("login")} /><InstallBanner /></>;
   }
 
   const TopBar = () => (
