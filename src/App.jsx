@@ -813,10 +813,7 @@ function RiderApp({ packages, onAcceptCollection, onConfirmCollection, onMarkAtW
         {/* Actions */}
         <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
           {pkg.status === "searching_rider" && !isMyCollection && (
-            <Btn onClick={() => doAction(async () => {
-              await onAcceptCollection(pkg.id, rider.id);
-              setFeed("active");
-            })} variant="primary" disabled={busy}>{busy ? "Accepting…" : "✅ Accept Order"}</Btn>
+            <Btn onClick={() => doAction(() => onAcceptCollection(pkg.id, rider.id))} variant="primary" disabled={busy}>{busy ? "Accepting…" : "✅ Accept Order"}</Btn>
           )}
           {pkg.status === "awaiting_collection" && isMyCollection && (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1721,31 +1718,38 @@ const profileToUser = (authUser, profile) => ({
 
 // Map a Supabase package row (snake_case) to app shape (camelCase)
 const dbPkgToApp = (p) => ({
-  id:                   p.id,
-  trackingCode:         p.tracking_code,
-  customerId:           p.customer_id,
-  customerName:         p.customer_name,
-  riderCollectionId:    p.rider_collection_id,
-  riderDeliveryId:      p.rider_delivery_id,
-  pickupAddress:        p.pickup_address,
-  deliveryAddress:      p.delivery_address,
-  deliveryZone:         p.delivery_zone,
-  description:          p.description,
-  size:                 p.size,
-  declaredValue:        p.declared_value,
-  base:                 p.base,
-  protectionFee:        p.protection_fee,
-  total:                p.total,
-  isHighValue:          p.is_high_value,
-  status:               p.status,
-  otpWarehouse:         p.otp_warehouse,
-  otpDelivery:          p.otp_delivery,
-  otpWarehouseVerified: p.otp_warehouse_verified,
-  otpDeliveryVerified:  p.otp_delivery_verified,
-  requestType:          p.request_type || 'delivery',
-  collectFromName:      p.collect_from_name || '',
-  collectFromPhone:     p.collect_from_phone || '',
-  createdAt:            p.created_at,
+  id:                     p.id,
+  trackingCode:           p.tracking_code,
+  customerId:             p.customer_id,
+  customerName:           p.customer_name,
+  recipientName:          p.recipient_name,
+  recipientPhone:         p.recipient_phone,
+  riderCollectionId:      p.rider_collection_id,
+  riderCollectionName:    (p.collection_rider && p.collection_rider.name)           || null,
+  riderCollectionPhone:   (p.collection_rider && p.collection_rider.phone)          || null,
+  riderCollectionLicense: (p.collection_rider && p.collection_rider.license_number) || null,
+  riderDeliveryId:        p.rider_delivery_id,
+  riderDeliveryName:      (p.delivery_rider && p.delivery_rider.name)  || null,
+  riderDeliveryPhone:     (p.delivery_rider && p.delivery_rider.phone) || null,
+  pickupAddress:          p.pickup_address,
+  deliveryAddress:        p.delivery_address,
+  deliveryZone:           p.delivery_zone,
+  description:            p.description,
+  size:                   p.size,
+  declaredValue:          p.declared_value,
+  base:                   p.base,
+  protectionFee:          p.protection_fee,
+  total:                  p.total,
+  isHighValue:            p.is_high_value,
+  status:                 p.status,
+  otpWarehouse:           p.otp_warehouse,
+  otpDelivery:            p.otp_delivery,
+  otpWarehouseVerified:   p.otp_warehouse_verified,
+  otpDeliveryVerified:    p.otp_delivery_verified,
+  requestType:            p.request_type || 'delivery',
+  collectFromName:        p.collect_from_name || '',
+  collectFromPhone:       p.collect_from_phone || '',
+  createdAt:              p.created_at,
 });
 
 // Map a Supabase transit_log row to app shape
@@ -2094,8 +2098,13 @@ export default function App() {
 
   // ── Fetch initial data ──
   const loadPackages = useCallback(async () => {
-    const { data } = await supabase.from("packages").select("*").order("created_at", { ascending: false });
-    if (data) setPackages(data.map(dbPkgToApp));
+    const selectQuery = "*,collection_rider:profiles!rider_collection_id(name,phone,license_number),delivery_rider:profiles!rider_delivery_id(name,phone)";
+    const { data, error } = await supabase.from("packages").select(selectQuery).order("created_at", { ascending: false });
+    if (error) { console.error("[loadPackages] error:", error); return; }
+    if (data) {
+      console.log("[loadPackages] raw statuses:", data.map(p => ({ id: p.id, status: p.status, ridCol: p.rider_collection_id, ridDel: p.rider_delivery_id })));
+      setPackages(data.map(dbPkgToApp));
+    }
   }, []);
 
   const loadLogs = useCallback(async () => {
@@ -2165,10 +2174,10 @@ export default function App() {
 
   // ── Update package in DB + immediately reflect in local state ──
   const updatePkg = async (id, updates) => {
-    // 1. Optimistically update local state NOW so UI responds instantly
+    // 1. Optimistically update local state immediately so UI responds
     setPackages(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
 
-    // 2. Convert camelCase app fields back to snake_case for DB
+    // 2. Write to Supabase
     const dbUpdates = {};
     if (updates.status               !== undefined) dbUpdates.status                    = updates.status;
     if (updates.riderCollectionId    !== undefined) dbUpdates.rider_collection_id        = updates.riderCollectionId;
@@ -2176,12 +2185,14 @@ export default function App() {
     if (updates.otpWarehouseVerified !== undefined) dbUpdates.otp_warehouse_verified     = updates.otpWarehouseVerified;
     if (updates.otpDeliveryVerified  !== undefined) dbUpdates.otp_delivery_verified      = updates.otpDeliveryVerified;
 
-    const { error } = await supabase.from("packages").update(dbUpdates).eq("id", id);
+    const { data: updatedRow, error } = await supabase.from("packages").update(dbUpdates).eq("id", id).select().single();
     if (error) {
-      // Roll back optimistic update on failure by reloading from DB
-      console.error("[updatePkg] failed:", error);
-      const { data } = await supabase.from("packages").select("*").eq("id", id).single();
-      if (data) setPackages(prev => prev.map(p => p.id === id ? dbPkgToApp(data) : p));
+      console.error("[updatePkg] FAILED:", error);
+      await loadPackages(); // re-sync from DB
+      alert(`DB update failed: ${error.message}`);
+    } else {
+      // Force a fresh load to be sure local state matches DB
+      await loadPackages();
     }
   };
 
