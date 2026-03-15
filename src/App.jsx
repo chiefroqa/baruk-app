@@ -250,14 +250,13 @@ const RIDERS = [
 // ============================================================
 const StatusBadge = ({ status }) => {
   const config = {
-    pickup_requested:          { label: "Pickup Requested",  color: "#8B5CF6", bg: "#EDE9FE" },
-    searching_rider:           { label: "Searching Rider",   color: "#F59E0B", bg: "#FEF3C7" },
-    rider_accepted_collection: { label: "Rider Accepted",    color: "#F97316", bg: "#FFF7ED" },
-    picked_up:                 { label: "Collected",         color: "#F87171", bg: "#FEF2F2" },
-    at_warehouse:              { label: "At Warehouse",      color: "#8B5CF6", bg: "#EDE9FE" },
-    out_for_delivery:          { label: "Out for Delivery",  color: "#10B981", bg: "#D1FAE5" },
-    delivered:                 { label: "Delivered",         color: "#059669", bg: "#ECFDF5" },
-    cancelled:                 { label: "Cancelled",         color: "#EF4444", bg: "#FEE2E2" },
+    pickup_requested: { label: "Pickup Requested", color: "#8B5CF6", bg: "#EDE9FE" },
+    searching_rider: { label: "Searching Rider", color: "#F59E0B", bg: "#FEF3C7" },
+    picked_up:       { label: "Picked Up", color: "#F87171", bg: "#FEF2F2" },
+    at_warehouse:    { label: "At Warehouse", color: "#8B5CF6", bg: "#EDE9FE" },
+    out_for_delivery:{ label: "Out for Delivery", color: "#10B981", bg: "#D1FAE5" },
+    delivered:       { label: "Delivered", color: "#059669", bg: "#ECFDF5" },
+    cancelled:       { label: "Cancelled", color: "#EF4444", bg: "#FEE2E2" },
   };
   const c = config[status] || { label: status, color: "#6B7280", bg: "#F3F4F6" };
   return (
@@ -407,24 +406,22 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
   };
 
   const TrackingProgress = ({ status }) => {
-    const steps  = ["searching_rider","rider_accepted_collection","picked_up","at_warehouse","out_for_delivery","delivered"];
-    const labels = ["Searching","Rider Accepted","Collected","At Hub","On the Way","Delivered"];
+    const steps  = ["searching_rider","picked_up","at_warehouse","out_for_delivery","delivered"];
+    const labels = ["Searching","Picked Up","At Hub","On the Way","Delivered"];
     const idx    = steps.indexOf(status);
     return (
-      <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch", margin: "16px 0" }}>
-        <div style={{ display: "flex", alignItems: "center", minWidth: 380 }}>
-          {steps.map((s, i) => (
-            <div key={s} style={{ display: "flex", alignItems: "center", flex: 1 }}>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
-                <div style={{ width: 24, height: 24, borderRadius: "50%", background: i <= idx ? "#DC2626" : "#E5E7EB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: i <= idx ? "#fff" : "#9CA3AF", fontWeight: 700, flexShrink: 0 }}>
-                  {i < idx ? "✓" : i + 1}
-                </div>
-                <div style={{ fontSize: 9, textAlign: "center", color: i <= idx ? "#DC2626" : "#9CA3AF", fontWeight: i === idx ? 800 : 500, marginTop: 4, lineHeight: 1.2, width: 48 }}>{labels[i]}</div>
+      <div style={{ display: "flex", alignItems: "center", margin: "16px 0" }}>
+        {steps.map((s, i) => (
+          <div key={s} style={{ display: "flex", alignItems: "center", flex: 1 }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
+              <div style={{ width: 24, height: 24, borderRadius: "50%", background: i <= idx ? "#DC2626" : "#E5E7EB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: i <= idx ? "#fff" : "#9CA3AF", fontWeight: 700, flexShrink: 0 }}>
+                {i < idx ? "✓" : i + 1}
               </div>
-              {i < steps.length - 1 && <div style={{ height: 2, flex: 1, background: i < idx ? "#DC2626" : "#E5E7EB", margin: "0 2px", marginBottom: 20, flexShrink: 0 }} />}
+              <div style={{ fontSize: 9, textAlign: "center", color: i <= idx ? "#DC2626" : "#9CA3AF", fontWeight: i === idx ? 800 : 500, marginTop: 4, lineHeight: 1.2, width: 52 }}>{labels[i]}</div>
             </div>
-          ))}
-        </div>
+            {i < steps.length - 1 && <div style={{ height: 2, flex: 1, background: i < idx ? "#DC2626" : "#E5E7EB", margin: "0 2px", marginBottom: 20, flexShrink: 0 }} />}
+          </div>
+        ))}
       </div>
     );
   };
@@ -686,37 +683,32 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
               </Card>
             )}
             {packages.map(pkg => (
-              <div key={pkg.id} onClick={() => setExpandedPkg(expandedPkg === pkg.id ? null : pkg.id)}
-                style={{ background: "#fff", borderRadius: 16, marginBottom: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.07), 0 4px 20px rgba(0,0,0,0.04)", cursor: "pointer" }}>
-                {/* Always-visible header */}
-                <div style={{ padding: "16px 16px 12px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#111827", fontFamily: "monospace" }}>{pkg.trackingCode}</div>
-                      <div style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>{pkg.description}</div>
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-                      <StatusBadge status={pkg.status} />
-                      {pkg.requestType === "pickup_request" && <div style={{ fontSize: 10, fontWeight: 700, color: "#7C3AED", background: "#EDE9FE", padding: "2px 8px", borderRadius: 20 }}>🛵 Pickup Req.</div>}
-                      {pkg.isHighValue && <HighValueBadge />}
-                    </div>
+              <Card key={pkg.id} style={{ marginBottom: 12, cursor: "pointer" }} onClick={() => setExpandedPkg(expandedPkg === pkg.id ? null : pkg.id)}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#111827", fontFamily: "monospace" }}>{pkg.trackingCode}</div>
+                    <div style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>{pkg.description}</div>
                   </div>
-                  {pkg.requestType === "pickup_request" && pkg.collectFromName && <div style={{ fontSize: 12, color: "#7C3AED", fontWeight: 600, marginBottom: 2 }}>🏪 {pkg.collectFromName}</div>}
-                  <div style={{ fontSize: 12, color: "#9CA3AF" }}>→ {pkg.deliveryAddress}</div>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, alignItems: "center" }}>
-                    <span style={{ fontSize: 12, color: "#6B7280" }}>KES {pkg.total}</span>
-                    <span style={{ fontSize: 12, color: "#DC2626", fontWeight: 700 }}>{expandedPkg === pkg.id ? "▲ Less" : "▼ Details"}</span>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                    <StatusBadge status={pkg.status} />
+                    {pkg.requestType === "pickup_request" && <div style={{ fontSize: 10, fontWeight: 700, color: "#7C3AED", background: "#EDE9FE", padding: "2px 8px", borderRadius: 20 }}>🛵 Pickup Req.</div>}
+                    {pkg.isHighValue && <HighValueBadge />}
                   </div>
                 </div>
-                {/* Expanded detail panel */}
+                {pkg.requestType === "pickup_request" && pkg.collectFromName && <div style={{ fontSize: 12, color: "#7C3AED", fontWeight: 600, marginBottom: 2 }}>🏪 {pkg.collectFromName}</div>}
+                <div style={{ fontSize: 12, color: "#9CA3AF" }}>→ {pkg.deliveryAddress}</div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: "#6B7280" }}>KES {pkg.total}</span>
+                  <span style={{ fontSize: 12, color: "#DC2626", fontWeight: 700 }}>{expandedPkg === pkg.id ? "▲ Less" : "▼ Details"}</span>
+                </div>
                 {expandedPkg === pkg.id && (
-                  <div style={{ borderTop: "1px solid #F3F4F6", padding: "14px 16px 16px" }}>
+                  <div style={{ marginTop: 14, borderTop: "1px solid #F3F4F6", paddingTop: 14 }}>
                     <TrackingProgress status={pkg.status} />
                     <div style={{ fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 10 }}>Chain of Custody</div>
                     <Timeline logs={transitLogs.filter(l => l.packageId === pkg.id)} />
                   </div>
                 )}
-              </div>
+              </Card>
             ))}
           </div>
         )}
@@ -728,7 +720,7 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
 // ============================================================
 // RIDER APP
 // ============================================================
-function RiderApp({ packages, onAcceptCollection, onConfirmCollected, onMarkAtWarehouse, onAcceptDelivery, onVerifyOTP, onMarkDelivered, transitLogs, currentRider }) {
+function RiderApp({ packages, onAcceptCollection, onMarkAtWarehouse, onAcceptDelivery, onVerifyOTP, onMarkDelivered, transitLogs, currentRider }) {
   const rider = currentRider || RIDERS[0];
   const [feed, setFeed] = useState("collection");
   const [otpInput, setOtpInput] = useState({});
@@ -786,14 +778,8 @@ function RiderApp({ packages, onAcceptCollection, onConfirmCollected, onMarkAtWa
           {pkg.status === "searching_rider" && !isMyCollection && (
             <Btn onClick={() => onAcceptCollection(pkg.id, rider.id)} variant="primary">Accept Collection</Btn>
           )}
-          {pkg.status === "rider_accepted_collection" && isMyCollection && (
-            <div style={{ background: "#FFF7ED", border: "1.5px solid #FED7AA", borderRadius: 10, padding: "10px 12px" }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#92400E", marginBottom: 8 }}>🏍️ Head to pickup address and collect the package</div>
-              <Btn onClick={() => onConfirmCollected(pkg.id)} variant="success" style={{ width: "100%" }}>✓ Confirm Collected</Btn>
-            </div>
-          )}
-          {pkg.status === "picked_up" && isMyCollection && (
-            <Btn onClick={() => onMarkAtWarehouse(pkg.id)} variant="success">✓ Mark: Arrived at Warehouse</Btn>
+          {pkg.status === "searching_rider" && isMyCollection && (
+            <Btn onClick={() => onMarkAtWarehouse(pkg.id, rider.id)} variant="success">✓ Mark: Arrived at Warehouse</Btn>
           )}
           {needsWarehouseOTP && (
             <div style={{ background: "#FEF2F2", border: "1.5px solid #FCA5A5", borderRadius: 10, padding: 12 }}>
@@ -1695,14 +1681,8 @@ export default function App() {
   // ── Rider actions ──
   const onAcceptCollection = async (pkgId, riderId) => {
     const pkg = packages.find(p => p.id === pkgId);
-    await updatePkg(pkgId, { riderCollectionId: riderId, status: "rider_accepted_collection" });
-    await addLog(pkgId, riderId, "rider", user.name, "RIDER_ACCEPTED_COLLECTION", pkg?.pickupAddress, "Rider accepted — heading to collect");
-  };
-
-  const onConfirmCollected = async (pkgId) => {
-    const pkg = packages.find(p => p.id === pkgId);
-    await updatePkg(pkgId, { status: "picked_up" });
-    await addLog(pkgId, user.id, "rider", user.name, "PACKAGE_COLLECTED", pkg?.pickupAddress, "Package collected");
+    await updatePkg(pkgId, { riderCollectionId: riderId, status: "picked_up" });
+    await addLog(pkgId, riderId, "rider", user.name, "COLLECTED_FROM_CUSTOMER", pkg?.pickupAddress, "Package collected");
   };
 
   const onMarkAtWarehouse = async (pkgId) => {
@@ -1787,7 +1767,7 @@ export default function App() {
     <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", background: "#F1F5F9", minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
       <TopBar />
       {user.role === "customer" && <CustomerApp packages={packages.filter(p => p.customerId === user.id)} onCreatePackage={onCreatePackage} transitLogs={logs} />}
-      {user.role === "rider"    && <RiderApp packages={packages} onAcceptCollection={onAcceptCollection} onConfirmCollected={onConfirmCollected} onMarkAtWarehouse={onMarkAtWarehouse} onAcceptDelivery={onAcceptDelivery} onVerifyOTP={onVerifyOTP} onMarkDelivered={onMarkDelivered} transitLogs={logs} currentRider={user} />}
+      {user.role === "rider"    && <RiderApp packages={packages} onAcceptCollection={onAcceptCollection} onMarkAtWarehouse={onMarkAtWarehouse} onAcceptDelivery={onAcceptDelivery} onVerifyOTP={onVerifyOTP} onMarkDelivered={onMarkDelivered} transitLogs={logs} currentRider={user} />}
       {user.role === "admin"    && <AdminDashboard packages={packages} riders={riders} transitLogs={logs} onDispatch={onDispatch} onAddRider={onAddRider} accounts={[...riders, user]} />}
       <InstallBanner />
     </div>
