@@ -275,8 +275,8 @@ const HighValueBadge = () => (
   </span>
 );
 
-const Card = ({ children, style = {} }) => (
-  <div style={{ background: "#fff", borderRadius: 16, padding: 20, boxShadow: "0 1px 4px rgba(0,0,0,0.07), 0 4px 20px rgba(0,0,0,0.04)", ...style }}>
+const Card = ({ children, style = {}, onClick }) => (
+  <div onClick={onClick} style={{ background: "#fff", borderRadius: 16, padding: 20, boxShadow: "0 1px 4px rgba(0,0,0,0.07), 0 4px 20px rgba(0,0,0,0.04)", ...(onClick ? { cursor: "pointer" } : {}), ...style }}>
     {children}
   </div>
 );
@@ -2244,10 +2244,9 @@ export default function App() {
   };
 
   const onDispatch = async (pkgId, riderId) => {
-    const rider = riders.find(r => r.id === riderId);
-    await updatePkg(pkgId, { riderDeliveryId: riderId, status: "out_for_delivery" });
-    await addLog(pkgId, user.id, "admin", user.name, "DISPATCHED_TO_RIDER", "Baruk Central, CBD", `Assigned to ${rider?.name}`);
-    await addLog(pkgId, riderId, "rider", rider?.name, "OUT_FOR_DELIVERY", "Baruk Central, CBD");
+    const assignedRider = riders.find(r => r.id === riderId);
+    await updatePkg(pkgId, { riderDeliveryId: riderId });
+    await addLog(pkgId, user.id, "admin", user.name, "DISPATCHED_TO_RIDER", "Baruk Central, CBD", `Assigned to ${assignedRider?.name || riderId} — awaiting collection from hub`);
   };
 
   const onAcceptDelivery = async (pkgId) => {
