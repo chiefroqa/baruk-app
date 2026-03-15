@@ -904,7 +904,7 @@ function RiderApp({ packages, onAcceptCollection, onConfirmCollection, onMarkAtW
         {/* Actions */}
         <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
           {pkg.status === "searching_rider" && !isMyCollection && (
-            <Btn onClick={() => doAction(() => onAcceptCollection(pkg.id, rider.id))} variant="primary" disabled={busy}>{busy ? "Accepting…" : "✅ Accept Order"}</Btn>
+            <Btn onClick={() => doAction(async () => { await onAcceptCollection(pkg.id, rider.id); setFeed("active"); })} variant="primary" disabled={busy}>{busy ? "Accepting…" : "✅ Accept Order"}</Btn>
           )}
           {pkg.status === "awaiting_collection" && isMyCollection && (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -2276,14 +2276,13 @@ export default function App() {
     if (updates.otpWarehouseVerified !== undefined) dbUpdates.otp_warehouse_verified     = updates.otpWarehouseVerified;
     if (updates.otpDeliveryVerified  !== undefined) dbUpdates.otp_delivery_verified      = updates.otpDeliveryVerified;
 
-    const { data: updatedRow, error } = await supabase.from("packages").update(dbUpdates).eq("id", id).select().single();
+    const { error } = await supabase.from("packages").update(dbUpdates).eq("id", id);
     if (error) {
       console.error("[updatePkg] FAILED:", error);
-      await loadPackages(); // re-sync from DB
+      await loadPackages(); // re-sync from DB with join
       alert(`DB update failed: ${error.message}`);
     } else {
-      // Force a fresh load to be sure local state matches DB
-      await loadPackages();
+      await loadPackages(); // re-sync with join to get rider name/phone/license
     }
   };
 
@@ -2323,7 +2322,13 @@ export default function App() {
   // ── Rider actions ──
   const onAcceptCollection = async (pkgId, riderId) => {
     const pkg = packages.find(p => p.id === pkgId);
-    await updatePkg(pkgId, { riderCollectionId: riderId, status: "awaiting_collection" });
+    await updatePkg(pkgId, {
+      riderCollectionId:      riderId,
+      riderCollectionName:    user.name,
+      riderCollectionPhone:   user.phone,
+      riderCollectionLicense: user.licenseNumber,
+      status:                 "awaiting_collection",
+    });
     await addLog(pkgId, user.id, "rider", user.name, "ACCEPTED_ORDER", pkg?.pickupAddress, `${user.name} accepted — heading to collect`);
   };
 
@@ -2350,7 +2355,11 @@ export default function App() {
 
   const onDispatch = async (pkgId, riderId) => {
     const assignedRider = riders.find(r => r.id === riderId);
-    await updatePkg(pkgId, { riderDeliveryId: riderId });
+    await updatePkg(pkgId, {
+      riderDeliveryId:    riderId,
+      riderDeliveryName:  assignedRider?.name  || "",
+      riderDeliveryPhone: assignedRider?.phone || "",
+    });
     await addLog(pkgId, user.id, "admin", user.name, "DISPATCHED_TO_RIDER", "Baruk Central, CBD", `Assigned to ${assignedRider?.name || riderId} — awaiting collection from hub`);
   };
 
