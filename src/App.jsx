@@ -813,7 +813,10 @@ function RiderApp({ packages, onAcceptCollection, onConfirmCollection, onMarkAtW
         {/* Actions */}
         <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
           {pkg.status === "searching_rider" && !isMyCollection && (
-            <Btn onClick={() => doAction(() => onAcceptCollection(pkg.id, rider.id))} variant="primary" disabled={busy}>{busy ? "Accepting…" : "✅ Accept Order"}</Btn>
+            <Btn onClick={() => doAction(async () => {
+              await onAcceptCollection(pkg.id, rider.id);
+              setFeed("active");
+            })} variant="primary" disabled={busy}>{busy ? "Accepting…" : "✅ Accept Order"}</Btn>
           )}
           {pkg.status === "awaiting_collection" && isMyCollection && (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
