@@ -2160,17 +2160,26 @@ export default function App() {
     });
   };
 
-  // ── Update package in DB ──
+  // ── Update package in DB + immediately reflect in local state ──
   const updatePkg = async (id, updates) => {
-    // Convert camelCase app fields back to snake_case for DB
+    // 1. Optimistically update local state NOW so UI responds instantly
+    setPackages(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+
+    // 2. Convert camelCase app fields back to snake_case for DB
     const dbUpdates = {};
     if (updates.status               !== undefined) dbUpdates.status                    = updates.status;
     if (updates.riderCollectionId    !== undefined) dbUpdates.rider_collection_id        = updates.riderCollectionId;
     if (updates.riderDeliveryId      !== undefined) dbUpdates.rider_delivery_id          = updates.riderDeliveryId;
     if (updates.otpWarehouseVerified !== undefined) dbUpdates.otp_warehouse_verified     = updates.otpWarehouseVerified;
     if (updates.otpDeliveryVerified  !== undefined) dbUpdates.otp_delivery_verified      = updates.otpDeliveryVerified;
-    await supabase.from("packages").update(dbUpdates).eq("id", id);
-    // Realtime will trigger loadPackages() automatically
+
+    const { error } = await supabase.from("packages").update(dbUpdates).eq("id", id);
+    if (error) {
+      // Roll back optimistic update on failure by reloading from DB
+      console.error("[updatePkg] failed:", error);
+      const { data } = await supabase.from("packages").select("*").eq("id", id).single();
+      if (data) setPackages(prev => prev.map(p => p.id === id ? dbPkgToApp(data) : p));
+    }
   };
 
   // ── Create new package ──
