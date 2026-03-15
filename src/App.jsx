@@ -325,31 +325,7 @@ const Stat = ({ label, value, sub, color = "#DC2626" }) => (
   </div>
 );
 
-const EVENT_LABELS = {
-  ORDER_PLACED:              "Order Placed",
-  PICKUP_REQUESTED:          "Pickup Requested",
-  RIDER_ACCEPTED_COLLECTION: "Rider Accepted — On the Way",
-  PACKAGE_COLLECTED:         "Collected",
-  COLLECTED_FROM_CUSTOMER:   "Collected",
-  ARRIVED_AT_WAREHOUSE:      "Arrived at Hub",
-  WAREHOUSE_ACCEPTED:        "Accepted at Hub",
-  DISPATCHED_TO_RIDER:       "Dispatched to Rider",
-  ACCEPTED_DELIVERY_JOB:     "Rider Accepted Delivery",
-  OUT_FOR_DELIVERY:          "Out for Delivery",
-  OTP_WAREHOUSE_VERIFIED:    "OTP Verified (Hub)",
-  OTP_DELIVERY_VERIFIED:     "OTP Verified (Delivery)",
-  DELIVERED:                 "Delivered",
-};
-
-const Timeline = ({ logs }) => {
-  const getLabel = (event) => {
-    if (!event) return "Unknown";
-    // Try exact match first, then uppercase, then title-case fallback
-    return EVENT_LABELS[event]
-      || EVENT_LABELS[event.toUpperCase()]
-      || event.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
-  };
-  return (
+const Timeline = ({ logs }) => (
   <div style={{ position: "relative" }}>
     {logs.map((log, i) => (
       <div key={log.id} style={{ display: "flex", gap: 12, marginBottom: i < logs.length - 1 ? 16 : 0 }}>
@@ -358,7 +334,7 @@ const Timeline = ({ logs }) => {
           {i < logs.length - 1 && <div style={{ width: 2, flex: 1, background: "#E5E7EB", marginTop: 4 }} />}
         </div>
         <div style={{ paddingBottom: i < logs.length - 1 ? 16 : 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>{getLabel(log.event)}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>{log.event.replace(/_/g, " ")}</div>
           <div style={{ fontSize: 12, color: "#6B7280" }}>{log.actorName} • {log.location}</div>
           <div style={{ fontSize: 11, color: "#9CA3AF" }}>{new Date(log.createdAt).toLocaleString()}</div>
           {log.notes && <div style={{ fontSize: 12, color: "#DC2626", marginTop: 2, fontStyle: "italic" }}>"{log.notes}"</div>}
@@ -366,8 +342,7 @@ const Timeline = ({ logs }) => {
       </div>
     ))}
   </div>
-  );
-};
+);
 
 // ============================================================
 // CUSTOMER APP
@@ -433,20 +408,20 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
 
   const TrackingProgress = ({ status }) => {
     const steps  = ["searching_rider","rider_accepted_collection","picked_up","at_warehouse","out_for_delivery","delivered"];
-    const labels = ["Searching","Accepted","Collected","At Hub","En Route","Delivered"];
+    const labels = ["Searching","Rider Accepted","Collected","At Hub","On the Way","Delivered"];
     const idx    = steps.indexOf(status);
     return (
-      <div style={{ margin: "14px 0" }}>
-        <div style={{ display: "flex", alignItems: "flex-start" }}>
+      <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch", margin: "16px 0" }}>
+        <div style={{ display: "flex", alignItems: "center", minWidth: 380 }}>
           {steps.map((s, i) => (
-            <div key={s} style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1, minWidth: 0 }}>
-                <div style={{ width: 20, height: 20, borderRadius: "50%", background: i <= idx ? "#DC2626" : "#E5E7EB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: i <= idx ? "#fff" : "#9CA3AF", fontWeight: 700, flexShrink: 0 }}>
+            <div key={s} style={{ display: "flex", alignItems: "center", flex: 1 }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
+                <div style={{ width: 24, height: 24, borderRadius: "50%", background: i <= idx ? "#DC2626" : "#E5E7EB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: i <= idx ? "#fff" : "#9CA3AF", fontWeight: 700, flexShrink: 0 }}>
                   {i < idx ? "✓" : i + 1}
                 </div>
-                <div style={{ fontSize: 8, textAlign: "center", color: i <= idx ? "#DC2626" : "#9CA3AF", fontWeight: i === idx ? 800 : 500, marginTop: 3, lineHeight: 1.2, maxWidth: "100%", wordBreak: "break-word" }}>{labels[i]}</div>
+                <div style={{ fontSize: 9, textAlign: "center", color: i <= idx ? "#DC2626" : "#9CA3AF", fontWeight: i === idx ? 800 : 500, marginTop: 4, lineHeight: 1.2, width: 48 }}>{labels[i]}</div>
               </div>
-              {i < steps.length - 1 && <div style={{ height: 2, flex: 1, background: i < idx ? "#DC2626" : "#E5E7EB", margin: "0 1px", marginBottom: 18, flexShrink: 0 }} />}
+              {i < steps.length - 1 && <div style={{ height: 2, flex: 1, background: i < idx ? "#DC2626" : "#E5E7EB", margin: "0 2px", marginBottom: 20, flexShrink: 0 }} />}
             </div>
           ))}
         </div>
@@ -579,7 +554,7 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
 
   // ── Main view ───────────────────────────────────────────────
   return (
-    <div style={{ maxWidth: 480, margin: "0 auto", fontFamily: "'DM Sans', system-ui, sans-serif", width: "100%" }}>
+    <div style={{ maxWidth: 480, margin: "0 auto", fontFamily: "'DM Sans', system-ui, sans-serif" }}>
       {/* Header */}
       <div style={{ background: "#fff", padding: "20px 20px 0", borderRadius: "0 0 24px 24px", borderBottom: "2px solid #FECACA", boxShadow: "0 2px 16px rgba(220,38,38,0.08)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
@@ -759,9 +734,9 @@ function RiderApp({ packages, onAcceptCollection, onConfirmCollected, onMarkAtWa
   const [otpInput, setOtpInput] = useState({});
   const [otpError, setOtpError] = useState({});
 
-  const collectionFeed = packages.filter(p => p.status === "searching_rider" && !p.riderCollectionId);
+  const collectionFeed = packages.filter(p => p.status === "searching_rider" && p.deliveryZone !== rider.zone);
   const myActive = packages.filter(p => p.riderCollectionId === rider.id || p.riderDeliveryId === rider.id);
-  const deliveryFeed = packages.filter(p => p.riderDeliveryId === rider.id && p.status === "at_warehouse");
+  const deliveryFeed = packages.filter(p => p.status === "at_warehouse" && p.deliveryZone === rider.zone && !p.riderDeliveryId);
 
   const handleOTPVerify = (pkg, type) => {
     const entered = otpInput[`${pkg.id}-${type}`] || "";
@@ -831,11 +806,8 @@ function RiderApp({ packages, onAcceptCollection, onConfirmCollected, onMarkAtWa
               {otpError[`${pkg.id}-warehouse`] && <div style={{ color: "#EF4444", fontSize: 12, marginTop: 6 }}>❌ Incorrect OTP. Try again.</div>}
             </div>
           )}
-          {pkg.status === "at_warehouse" && isMyDelivery && (
-            <div style={{ background: "#EEF2FF", border: "1.5px solid #C7D2FE", borderRadius: 10, padding: "10px 12px" }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#3730A3", marginBottom: 8 }}>📦 Package dispatched to you — collect from hub</div>
-              <Btn onClick={() => onAcceptDelivery(pkg.id, rider.id)} variant="primary" style={{ width: "100%" }}>✅ Accept &amp; Collected from Hub</Btn>
-            </div>
+          {pkg.status === "at_warehouse" && !isMyDelivery && pkg.deliveryZone === rider.zone && (
+            <Btn onClick={() => onAcceptDelivery(pkg.id, rider.id)} variant="primary">Accept Delivery</Btn>
           )}
           {needsDeliveryOTP && (
             <div style={{ background: "#FEF2F2", border: "1.5px solid #FCA5A5", borderRadius: 10, padding: 12 }}>
@@ -1015,9 +987,7 @@ function AdminDashboard({ packages, riders, transitLogs, onDispatch, onAddRider,
                         </div>
                       </td>
                       <td style={{ padding: "12px 16px" }}>
-                        {pkg.riderDeliveryId ? (
-                          <span style={{ fontSize: 12, fontWeight: 700, color: "#10B981", background: "#ECFDF5", padding: "4px 10px", borderRadius: 20 }}>✓ Dispatched</span>
-                        ) : selectedPkg?.id === pkg.id ? (
+                        {selectedPkg?.id === pkg.id ? (
                           <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 180 }}>
                             <select value={selectedRider} onChange={e => setSelectedRider(e.target.value)} style={{ padding: "6px 10px", border: "1.5px solid #E5E7EB", borderRadius: 8, fontSize: 13, fontFamily: "inherit" }}>
                               <option value="">Select Rider...</option>
@@ -1160,7 +1130,7 @@ function AdminDashboard({ packages, riders, transitLogs, onDispatch, onAddRider,
                       <tr key={log.id} style={{ borderBottom: "1px solid #F3F4F6" }}>
                         <td style={{ padding: "10px 12px", fontFamily: "monospace", fontSize: 12, fontWeight: 700, color: "#DC2626" }}>{pkg?.trackingCode || log.packageId.slice(0,8)}</td>
                         <td style={{ padding: "10px 12px" }}>
-                          <span style={{ background: "#F0FDF4", color: "#166534", padding: "2px 8px", borderRadius: 6, fontSize: 12, fontWeight: 700 }}>{EVENT_LABELS[log.event] || EVENT_LABELS[log.event?.toUpperCase()] || log.event?.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}</span>
+                          <span style={{ background: "#F0FDF4", color: "#166534", padding: "2px 8px", borderRadius: 6, fontSize: 12, fontWeight: 700 }}>{log.event.replace(/_/g, " ")}</span>
                         </td>
                         <td style={{ padding: "10px 12px", fontSize: 13, color: "#374151" }}>{log.actorName} <span style={{ fontSize: 11, color: "#9CA3AF" }}>({log.actorRole})</span></td>
                         <td style={{ padding: "10px 12px", fontSize: 12, color: "#6B7280" }}>{log.location}</td>
@@ -1247,11 +1217,6 @@ const dbPkgToApp = (p) => ({
   customerName:         p.customer_name,
   riderCollectionId:    p.rider_collection_id,
   riderDeliveryId:      p.rider_delivery_id,
-  riderCollectionName:  p.collection_rider?.name  || null,
-  riderCollectionPhone: p.collection_rider?.phone || null,
-  riderCollectionLicense: p.collection_rider?.license_number || null,
-  riderDeliveryName:    p.delivery_rider?.name    || null,
-  riderDeliveryPhone:   p.delivery_rider?.phone   || null,
   pickupAddress:        p.pickup_address,
   deliveryAddress:      p.delivery_address,
   deliveryZone:         p.delivery_zone,
@@ -1395,263 +1360,9 @@ function SignupScreen({ onBack }) {
 }
 
 // ============================================================
-// HOME LANDING PAGE
-// ============================================================
-function HomeLandingPage({ onSignup, onLogin }) {
-  const [form, setForm]       = useState({ name: "", email: "", phone: "", password: "", confirm: "" });
-  const [error, setError]     = useState("");
-  const [success, setSuccess] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [activeFeature, setActiveFeature] = useState(0);
-  const set = k => v => setForm(f => ({ ...f, [k]: v }));
-
-  const handleSignup = async () => {
-    setError(""); setSuccess("");
-    if (!form.name || !form.email || !form.phone || !form.password || !form.confirm)
-      return setError("Please fill in all fields.");
-    if (form.password.length < 6) return setError("Password must be at least 6 characters.");
-    if (form.password !== form.confirm) return setError("Passwords do not match.");
-    setLoading(true);
-    try {
-      const { error: signUpError } = await supabase.auth.signUp({
-        email: form.email.trim().toLowerCase(),
-        password: form.password,
-        options: { data: { name: form.name.trim(), phone: form.phone.trim(), role: "customer" } },
-      });
-      if (signUpError) throw signUpError;
-      setSuccess("Account created! Welcome to Baruk 🎉");
-    } catch (err) {
-      setError(err.message || "Signup failed. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const features = [
-    { icon: "🏍️", title: "Real-Time Tracking", desc: "Watch your package move across Nairobi live. Every handoff logged — from pickup to doorstep." },
-    { icon: "🛵", title: "Pickup Requests", desc: "Shop online, at a tailor, or a supplier? We collect from them and deliver straight to you." },
-    { icon: "🔐", title: "OTP-Secured Handoffs", desc: "High-value items get PIN-verified at every step. No package changes hands without confirmation." },
-    { icon: "🛡️", title: "Package Protection", desc: "Opt-in insurance for valuables. Full coverage, zero stress on items that matter most." },
-    { icon: "⚡", title: "Same-Day Delivery", desc: "From Westlands to Karen, Thika Road to Ngong — most deliveries done the same day." },
-    { icon: "📍", title: "Zone-Based Pricing", desc: "Transparent flat rates per zone. No surprises, no hidden fees — just fair delivery costs." },
-  ];
-
-  const steps = [
-    { n: "01", title: "Book in seconds", desc: "Fill in pickup, drop-off, and package details. Get an instant price quote.", color: "#DC2626" },
-    { n: "02", title: "Rider collects", desc: "A Baruk rider heads to your location. Track them in real-time on your dashboard.", color: "#F97316" },
-    { n: "03", title: "Hub verification", desc: "Package is logged at Baruk Central with a full custody record. Insured items confirmed.", color: "#8B5CF6" },
-    { n: "04", title: "Delivered to door", desc: "A delivery rider takes it the last mile. OTP handoff for high-value items.", color: "#10B981" },
-  ];
-
-  const inp = (placeholder, type, key, icon) => (
-    <div style={{ position: "relative", marginBottom: 12 }}>
-      <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", fontSize: 14, pointerEvents: "none", zIndex: 1 }}>{icon}</span>
-      <input
-        type={type} value={form[key]} onChange={e => set(key)(e.target.value)}
-        placeholder={placeholder}
-        style={{ width: "100%", padding: "13px 14px 13px 40px", background: "rgba(255,255,255,0.07)", border: "1.5px solid rgba(255,255,255,0.12)", borderRadius: 12, fontSize: 14, fontFamily: "inherit", boxSizing: "border-box", outline: "none", color: "#fff", transition: "border 0.2s" }}
-        onFocus={e => e.target.style.borderColor = "#DC2626"}
-        onBlur={e => e.target.style.borderColor = "rgba(255,255,255,0.12)"}
-      />
-    </div>
-  );
-
-  return (
-    <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", background: "#0A0A0A", color: "#fff", overflowX: "hidden" }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Sans:wght@400;500;600;700;800;900&display=swap');
-        .hero-title { font-family: 'Syne', sans-serif; }
-        @keyframes fadeUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes pulse-red { 0%,100% { box-shadow: 0 0 0 0 rgba(220,38,38,0.4); } 50% { box-shadow: 0 0 0 12px rgba(220,38,38,0); } }
-        @keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
-        .fade-up-1 { animation: fadeUp 0.6s ease forwards; }
-        .fade-up-2 { animation: fadeUp 0.6s 0.15s ease both; }
-        .fade-up-3 { animation: fadeUp 0.6s 0.3s ease both; }
-        .fade-up-4 { animation: fadeUp 0.6s 0.45s ease both; }
-        .cta-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(220,38,38,0.5) !important; }
-        .feature-card:hover { background: rgba(220,38,38,0.08) !important; border-color: rgba(220,38,38,0.3) !important; transform: translateY(-2px); }
-        .feature-card { transition: all 0.2s ease; }
-        input::placeholder { color: rgba(255,255,255,0.3); }
-      `}</style>
-
-      {/* ── NAV ── */}
-      <nav style={{ position: "sticky", top: 0, zIndex: 100, background: "rgba(10,10,10,0.85)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 34, height: 34, borderRadius: 10, background: "#DC2626", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, animation: "pulse-red 2.5s infinite" }}>🏍️</div>
-          <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 900, color: "#fff", letterSpacing: "-0.5px" }}>Baruk</span>
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={onLogin} style={{ padding: "8px 18px", background: "transparent", border: "1.5px solid rgba(255,255,255,0.15)", color: "#fff", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Sign In</button>
-          <button onClick={() => document.getElementById("signup-section").scrollIntoView({ behavior: "smooth" })} style={{ padding: "8px 18px", background: "#DC2626", border: "none", color: "#fff", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 4px 16px rgba(220,38,38,0.35)" }}>Get Started</button>
-        </div>
-      </nav>
-
-      {/* ── TICKER ── */}
-      <div style={{ background: "#DC2626", padding: "8px 0", overflow: "hidden", whiteSpace: "nowrap" }}>
-        <div style={{ display: "inline-flex", animation: "ticker 18s linear infinite", gap: 0 }}>
-          {[...Array(2)].map((_, i) => (
-            <span key={i} style={{ display: "inline-flex", gap: 0 }}>
-              {["🏍️ Same-Day Delivery across Nairobi", "🛵 Pickup Requests from any shop or supplier", "🔐 OTP-secured high-value handoffs", "📍 Real-time package tracking", "🛡️ Optional package protection", "⚡ Flat zone-based pricing"].map((t, j) => (
-                <span key={j} style={{ display: "inline-block", padding: "0 32px", fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", color: "rgba(255,255,255,0.9)" }}>{t} &nbsp;•</span>
-              ))}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {/* ── HERO ── */}
-      <section style={{ padding: "72px 24px 80px", maxWidth: 640, margin: "0 auto", textAlign: "center", position: "relative" }}>
-        {/* Background glow */}
-        <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 400, height: 400, background: "radial-gradient(circle, rgba(220,38,38,0.12) 0%, transparent 70%)", pointerEvents: "none" }} />
-
-        <div className="fade-up-1" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(220,38,38,0.12)", border: "1px solid rgba(220,38,38,0.25)", borderRadius: 100, padding: "6px 16px", marginBottom: 24 }}>
-          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#DC2626", display: "inline-block", animation: "pulse-red 1.5s infinite" }} />
-          <span style={{ fontSize: 12, fontWeight: 700, color: "#FCA5A5", letterSpacing: "0.06em", textTransform: "uppercase" }}>Live in Nairobi</span>
-        </div>
-
-        <h1 className="hero-title fade-up-2" style={{ fontSize: "clamp(40px, 10vw, 68px)", fontWeight: 900, lineHeight: 1.05, margin: "0 0 20px", letterSpacing: "-2px" }}>
-          Nairobi's fastest<br />
-          <span style={{ color: "#DC2626", position: "relative" }}>delivery network</span>
-        </h1>
-
-        <p className="fade-up-3" style={{ fontSize: 17, color: "rgba(255,255,255,0.55)", lineHeight: 1.65, margin: "0 0 36px", maxWidth: 480, marginLeft: "auto", marginRight: "auto" }}>
-          Send parcels. Request pickups. Track every handoff in real time — from the moment a rider accepts to the second your package lands at the door.
-        </p>
-
-        <div className="fade-up-4" style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-          <button className="cta-btn" onClick={() => document.getElementById("signup-section").scrollIntoView({ behavior: "smooth" })}
-            style={{ padding: "14px 32px", background: "#DC2626", color: "#fff", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 8px 24px rgba(220,38,38,0.35)", transition: "all 0.2s" }}>
-            Start Sending — Free
-          </button>
-          <button onClick={onLogin}
-            style={{ padding: "14px 28px", background: "rgba(255,255,255,0.06)", color: "#fff", border: "1.5px solid rgba(255,255,255,0.1)", borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-            Sign In →
-          </button>
-        </div>
-
-        {/* Social proof */}
-        <div style={{ marginTop: 48, display: "flex", justifyContent: "center", gap: 32, flexWrap: "wrap" }}>
-          {[["500+", "Deliveries Done"], ["4.9★", "Customer Rating"], ["< 4hr", "Avg Delivery Time"]].map(([n, l]) => (
-            <div key={l} style={{ textAlign: "center" }}>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 26, fontWeight: 900, color: "#fff" }}>{n}</div>
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontWeight: 600, marginTop: 2 }}>{l}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── FEATURES ── */}
-      <section style={{ padding: "72px 24px", background: "rgba(255,255,255,0.02)", borderTop: "1px solid rgba(255,255,255,0.05)", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-        <div style={{ maxWidth: 640, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 48 }}>
-            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.12em", color: "#DC2626", textTransform: "uppercase", marginBottom: 12 }}>Why Baruk</div>
-            <h2 className="hero-title" style={{ fontSize: "clamp(28px, 7vw, 44px)", fontWeight: 900, margin: 0, letterSpacing: "-1px" }}>Built different.<br />Built for Nairobi.</h2>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            {features.map((f, i) => (
-              <div key={i} className="feature-card" style={{ background: "rgba(255,255,255,0.04)", border: "1.5px solid rgba(255,255,255,0.07)", borderRadius: 16, padding: "20px 18px", cursor: "default" }}>
-                <div style={{ fontSize: 28, marginBottom: 10 }}>{f.icon}</div>
-                <div style={{ fontSize: 14, fontWeight: 800, color: "#fff", marginBottom: 6, lineHeight: 1.3 }}>{f.title}</div>
-                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", lineHeight: 1.6 }}>{f.desc}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── HOW IT WORKS ── */}
-      <section style={{ padding: "72px 24px" }}>
-        <div style={{ maxWidth: 640, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 48 }}>
-            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.12em", color: "#DC2626", textTransform: "uppercase", marginBottom: 12 }}>The Process</div>
-            <h2 className="hero-title" style={{ fontSize: "clamp(28px, 7vw, 44px)", fontWeight: 900, margin: 0, letterSpacing: "-1px" }}>From booking<br />to doorstep.</h2>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            {steps.map((s, i) => (
-              <div key={i} style={{ display: "flex", gap: 20, alignItems: "flex-start", padding: "20px 0", borderBottom: i < steps.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 36, fontWeight: 900, color: s.color, lineHeight: 1, flexShrink: 0, minWidth: 52 }}>{s.n}</div>
-                <div>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: "#fff", marginBottom: 4 }}>{s.title}</div>
-                  <div style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", lineHeight: 1.6 }}>{s.desc}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── PICKUP CALLOUT ── */}
-      <section style={{ padding: "0 24px 72px" }}>
-        <div style={{ maxWidth: 640, margin: "0 auto" }}>
-          <div style={{ background: "linear-gradient(135deg, rgba(139,92,246,0.15) 0%, rgba(220,38,38,0.1) 100%)", border: "1.5px solid rgba(139,92,246,0.25)", borderRadius: 20, padding: "28px 24px" }}>
-            <div style={{ fontSize: 32, marginBottom: 12 }}>🛵</div>
-            <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 900, margin: "0 0 10px", letterSpacing: "-0.5px" }}>Pickup Requests — a Baruk exclusive</h3>
-            <p style={{ fontSize: 14, color: "rgba(255,255,255,0.55)", lineHeight: 1.7, margin: "0 0 20px" }}>
-              Ordered something from a tailor in Westlands? Bought fabric from a supplier in Gikomba? Waiting on a delivery from a shop that doesn't deliver?<br /><br />
-              <strong style={{ color: "#C4B5FD" }}>Tell us where to collect, and we'll bring it straight to you.</strong> We pay a visit, pick it up, and it's at your door the same day.
-            </p>
-            <button className="cta-btn" onClick={() => document.getElementById("signup-section").scrollIntoView({ behavior: "smooth" })}
-              style={{ padding: "12px 24px", background: "#8B5CF6", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 4px 20px rgba(139,92,246,0.35)", transition: "all 0.2s" }}>
-              Try Pickup Requests →
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* ── SIGNUP FORM ── */}
-      <section id="signup-section" style={{ padding: "72px 24px 80px", background: "rgba(220,38,38,0.04)", borderTop: "1px solid rgba(220,38,38,0.15)" }}>
-        <div style={{ maxWidth: 440, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 36 }}>
-            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.12em", color: "#DC2626", textTransform: "uppercase", marginBottom: 12 }}>Join Baruk</div>
-            <h2 className="hero-title" style={{ fontSize: "clamp(28px, 7vw, 38px)", fontWeight: 900, margin: "0 0 10px", letterSpacing: "-1px" }}>Start delivering today.</h2>
-            <p style={{ fontSize: 14, color: "rgba(255,255,255,0.45)", margin: 0 }}>Free account. No commitments. Just fast, tracked deliveries.</p>
-          </div>
-
-          <div style={{ background: "rgba(255,255,255,0.04)", border: "1.5px solid rgba(255,255,255,0.08)", borderRadius: 20, padding: "28px 24px" }}>
-            {inp("Full Name", "text", "name", "👤")}
-            {inp("Email Address", "email", "email", "✉️")}
-            {inp("Phone Number", "tel", "phone", "📞")}
-            {inp("Password (min 6 chars)", "password", "password", "🔒")}
-            {inp("Confirm Password", "password", "confirm", "🔒")}
-
-            {error && <div style={{ background: "rgba(220,38,38,0.15)", border: "1px solid rgba(220,38,38,0.3)", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#FCA5A5", fontWeight: 600, marginBottom: 12 }}>⚠️ {error}</div>}
-            {success && <div style={{ background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.3)", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#6EE7B7", fontWeight: 600, marginBottom: 12 }}>✅ {success}</div>}
-
-            <button className="cta-btn" onClick={handleSignup} disabled={loading || !!success}
-              style={{ width: "100%", padding: "14px", background: loading || success ? "rgba(220,38,38,0.4)" : "#DC2626", color: "#fff", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 800, cursor: loading || success ? "not-allowed" : "pointer", fontFamily: "inherit", boxShadow: "0 8px 24px rgba(220,38,38,0.3)", transition: "all 0.2s", marginTop: 4 }}>
-              {loading ? "Creating account..." : success ? "You're in! 🎉" : "Create Free Account →"}
-            </button>
-
-            <div style={{ textAlign: "center", marginTop: 18, fontSize: 13, color: "rgba(255,255,255,0.35)" }}>
-              Already have an account?{" "}
-              <button onClick={onLogin} style={{ background: "none", border: "none", color: "#FCA5A5", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>Sign In</button>
-            </div>
-          </div>
-
-          <div style={{ marginTop: 20, padding: "14px 16px", background: "rgba(255,255,255,0.03)", borderRadius: 12, border: "1px solid rgba(255,255,255,0.06)" }}>
-            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", lineHeight: 1.7 }}>
-              🏍️ <strong style={{ color: "rgba(255,255,255,0.6)" }}>Riders:</strong> Your account is created by the Hub Admin. Contact your hub manager for login credentials.
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── FOOTER ── */}
-      <footer style={{ padding: "28px 24px", borderTop: "1px solid rgba(255,255,255,0.06)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 26, height: 26, borderRadius: 7, background: "#DC2626", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 }}>🏍️</div>
-          <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 900, color: "rgba(255,255,255,0.7)" }}>Baruk</span>
-        </div>
-        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.2)" }}>Fast. Reliable. Trackable. — Nairobi</div>
-      </footer>
-    </div>
-  );
-}
-
-// ============================================================
 // LOGIN SCREEN
 // ============================================================
-function LoginScreen({ onGoSignup, onGoHome }) {
+function LoginScreen({ onGoSignup }) {
   const [email, setEmail]               = useState("");
   const [password, setPassword]         = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -1677,7 +1388,6 @@ function LoginScreen({ onGoSignup, onGoHome }) {
   return (
     <div style={{ minHeight: "100dvh", background: "#F9FAFB", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', system-ui, sans-serif", padding: 20 }}>
       <div style={{ width: "100%", maxWidth: 420 }}>
-        {onGoHome && <button onClick={onGoHome} style={{ background: "none", border: "none", color: "#DC2626", fontWeight: 700, fontSize: 13, cursor: "pointer", marginBottom: 16, fontFamily: "inherit", padding: 0 }}>← Back to Home</button>}
         <AuthLogo />
         <div style={{ background: "#fff", borderRadius: 20, padding: 28, boxShadow: "0 4px 32px rgba(0,0,0,0.08)" }}>
           <div style={{ fontSize: 22, fontWeight: 900, color: "#111827", marginBottom: 4 }}>Welcome back</div>
@@ -1855,7 +1565,7 @@ function InstallBanner() {
 // ============================================================
 export default function App() {
   const [user, setUser]         = useState(null);
-  const [authView, setAuthView] = useState("home");
+  const [authView, setAuthView] = useState("login");
   const [appLoading, setAppLoading] = useState(true);
   const [packages, setPackages] = useState([]);
   const [logs, setLogs]         = useState([]);
@@ -1874,8 +1584,7 @@ export default function App() {
 
   // ── Fetch initial data ──
   const loadPackages = useCallback(async () => {
-    const selectQuery = "*,collection_rider:profiles!rider_collection_id(name,phone,license_number),delivery_rider:profiles!rider_delivery_id(name,phone)";
-    const { data } = await supabase.from("packages").select(selectQuery).order("created_at", { ascending: false });
+    const { data } = await supabase.from("packages").select("*").order("created_at", { ascending: false });
     if (data) setPackages(data.map(dbPkgToApp));
   }, []);
 
@@ -1939,8 +1648,6 @@ export default function App() {
 
   // ── Update package in DB ──
   const updatePkg = async (id, updates) => {
-    // Optimistic local update — instant UI response
-    setPackages(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
     // Convert camelCase app fields back to snake_case for DB
     const dbUpdates = {};
     if (updates.status               !== undefined) dbUpdates.status                    = updates.status;
@@ -1948,9 +1655,8 @@ export default function App() {
     if (updates.riderDeliveryId      !== undefined) dbUpdates.rider_delivery_id          = updates.riderDeliveryId;
     if (updates.otpWarehouseVerified !== undefined) dbUpdates.otp_warehouse_verified     = updates.otpWarehouseVerified;
     if (updates.otpDeliveryVerified  !== undefined) dbUpdates.otp_delivery_verified      = updates.otpDeliveryVerified;
-    const { error } = await supabase.from("packages").update(dbUpdates).eq("id", id);
-    // On error, re-sync from DB to recover correct state
-    if (error) loadPackages();
+    await supabase.from("packages").update(dbUpdates).eq("id", id);
+    // Realtime will trigger loadPackages() automatically
   };
 
   // ── Create new package ──
@@ -2006,13 +1712,14 @@ export default function App() {
 
   const onDispatch = async (pkgId, riderId) => {
     const rider = riders.find(r => r.id === riderId);
-    await updatePkg(pkgId, { riderDeliveryId: riderId, status: "at_warehouse" });
+    await updatePkg(pkgId, { riderDeliveryId: riderId, status: "out_for_delivery" });
     await addLog(pkgId, user.id, "admin", user.name, "DISPATCHED_TO_RIDER", "Baruk Central, CBD", `Assigned to ${rider?.name}`);
+    await addLog(pkgId, riderId, "rider", rider?.name, "OUT_FOR_DELIVERY", "Baruk Central, CBD");
   };
 
   const onAcceptDelivery = async (pkgId, riderId) => {
-    await updatePkg(pkgId, { status: "out_for_delivery" });
-    await addLog(pkgId, riderId, "rider", user.name, "ACCEPTED_DELIVERY_JOB", "Baruk Central, CBD", "Rider collected from hub — heading to customer");
+    await updatePkg(pkgId, { riderDeliveryId: riderId });
+    await addLog(pkgId, riderId, "rider", user.name, "ACCEPTED_DELIVERY_JOB", "Baruk Central, CBD");
   };
 
   const onVerifyOTP = async (pkgId, type) => {
@@ -2058,9 +1765,8 @@ export default function App() {
   if (appLoading) return <LoadingScreen />;
 
   if (!user) {
-    if (authView === "home")   return <><HomeLandingPage onSignup={() => setAuthView("signup")} onLogin={() => setAuthView("login")} /><InstallBanner /></>;
-    if (authView === "signup") return <><SignupScreen onBack={() => setAuthView("home")} /><InstallBanner /></>;
-    return <><LoginScreen onGoSignup={() => setAuthView("signup")} onGoHome={() => setAuthView("home")} /><InstallBanner /></>;
+    if (authView === "signup") return <><SignupScreen onBack={() => setAuthView("login")} /><InstallBanner /></>;
+    return <><LoginScreen onGoSignup={() => setAuthView("signup")} /><InstallBanner /></>;
   }
 
   const TopBar = () => (
