@@ -2276,13 +2276,16 @@ export default function App() {
     if (updates.otpWarehouseVerified !== undefined) dbUpdates.otp_warehouse_verified     = updates.otpWarehouseVerified;
     if (updates.otpDeliveryVerified  !== undefined) dbUpdates.otp_delivery_verified      = updates.otpDeliveryVerified;
 
-    const { error } = await supabase.from("packages").update(dbUpdates).eq("id", id);
+    console.log("[updatePkg] writing to DB:", { id, dbUpdates });
+    const { data: updatedRow, error } = await supabase.from("packages").update(dbUpdates).eq("id", id).select().single();
     if (error) {
       console.error("[updatePkg] FAILED:", error);
-      await loadPackages(); // re-sync from DB with join
-      alert(`DB update failed: ${error.message}`);
+      await loadPackages(); // re-sync from DB
+      alert(`DB update failed: ${error.message}\n\nPayload: ${JSON.stringify(dbUpdates)}\n\nCheck browser console for details.`);
     } else {
-      await loadPackages(); // re-sync with join to get rider name/phone/license
+      console.log("[updatePkg] success, DB now has:", { id: updatedRow?.id, status: updatedRow?.status });
+      // Force a fresh load with join to get rider name/phone/license
+      await loadPackages();
     }
   };
 
@@ -2323,11 +2326,8 @@ export default function App() {
   const onAcceptCollection = async (pkgId, riderId) => {
     const pkg = packages.find(p => p.id === pkgId);
     await updatePkg(pkgId, {
-      riderCollectionId:      riderId,
-      riderCollectionName:    user.name,
-      riderCollectionPhone:   user.phone,
-      riderCollectionLicense: user.licenseNumber,
-      status:                 "awaiting_collection",
+      riderCollectionId: riderId,
+      status:            "awaiting_collection",
     });
     await addLog(pkgId, user.id, "rider", user.name, "ACCEPTED_ORDER", pkg?.pickupAddress, `${user.name} accepted — heading to collect`);
   };
@@ -2355,11 +2355,7 @@ export default function App() {
 
   const onDispatch = async (pkgId, riderId) => {
     const assignedRider = riders.find(r => r.id === riderId);
-    await updatePkg(pkgId, {
-      riderDeliveryId:    riderId,
-      riderDeliveryName:  assignedRider?.name  || "",
-      riderDeliveryPhone: assignedRider?.phone || "",
-    });
+    await updatePkg(pkgId, { riderDeliveryId: riderId });
     await addLog(pkgId, user.id, "admin", user.name, "DISPATCHED_TO_RIDER", "Baruk Central, CBD", `Assigned to ${assignedRider?.name || riderId} — awaiting collection from hub`);
   };
 
