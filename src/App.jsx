@@ -357,7 +357,121 @@ const MPESA_NAME    = "Coral Crafts";
 // ============================================================
 // CUSTOMER APP
 // ============================================================
-function CustomerApp({ packages, onCreatePackage, transitLogs }) {
+
+// ── Opens a full-page printable receipt in a new tab ──────────────────────
+const openReceipt = (pkg, mpesaCodeVal = "") => {
+  const paid = pkg.paymentStatus === "paid";
+  const pod  = pkg.paymentStatus === "paid_on_delivery" || pkg.paymentStatus === "unpaid";
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Baruk Receipt — ${pkg.trackingCode}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #f5f5f5; padding: 24px 16px; color: #111; }
+  .page { max-width: 480px; margin: 0 auto; background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.1); }
+  .header { background: #DC2626; padding: 28px 24px; text-align: center; }
+  .header .logo { font-size: 36px; margin-bottom: 4px; }
+  .header h1 { font-size: 28px; font-weight: 900; color: #fff; letter-spacing: -1px; }
+  .header p { font-size: 13px; color: rgba(255,255,255,0.8); margin-top: 4px; }
+  .badge { display: inline-block; margin-top: 12px; padding: 5px 16px; border-radius: 100px; font-size: 13px; font-weight: 800; letter-spacing: 0.05em; }
+  .badge.paid { background: #D1FAE5; color: #065F46; }
+  .badge.unpaid { background: #FFF3CD; color: #7D5A00; }
+  .section { padding: 20px 24px; border-bottom: 1px solid #F3F4F6; }
+  .section-title { font-size: 10px; font-weight: 700; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 14px; }
+  .row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; gap: 12px; }
+  .row .label { font-size: 13px; color: #6B7280; flex-shrink: 0; }
+  .row .value { font-size: 13px; font-weight: 700; color: #111; text-align: right; }
+  .row .value.mono { font-family: monospace; font-size: 14px; color: #DC2626; }
+  .total-row { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; background: #FEF2F2; }
+  .total-row .label { font-size: 16px; font-weight: 800; }
+  .total-row .value { font-size: 24px; font-weight: 900; color: #DC2626; }
+  .mpesa-section { padding: 20px 24px; background: #F0FDF4; border-bottom: 1px solid #DCFCE7; }
+  .mpesa-title { font-size: 14px; font-weight: 800; color: #14532D; margin-bottom: 12px; }
+  .mpesa-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
+  .mpesa-row .label { font-size: 12px; color: #16A34A; font-weight: 700; }
+  .mpesa-row .value { font-size: 13px; font-weight: 800; color: #14532D; letter-spacing: 1px; }
+  .pod-section { padding: 20px 24px; background: #FFFBEB; border-bottom: 1px solid #FDE68A; }
+  .pod-title { font-size: 14px; font-weight: 800; color: #92400E; margin-bottom: 6px; }
+  .pod-note { font-size: 12px; color: #78350F; line-height: 1.6; }
+  .footer { padding: 20px 24px; text-align: center; }
+  .footer p { font-size: 12px; color: #9CA3AF; line-height: 1.8; }
+  .footer strong { color: #DC2626; }
+  @media print { body { background: #fff; padding: 0; } .page { box-shadow: none; border-radius: 0; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div class="logo">🏍️</div>
+    <h1>Baruk</h1>
+    <p>Fast. Reliable. Trackable.</p>
+    <div class="badge ${paid ? 'paid' : 'unpaid'}">${paid ? '✅ PAID — M-Pesa' : pod ? '💵 PAY ON DELIVERY' : '⏳ PAYMENT PENDING'}</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Order Details</div>
+    <div class="row"><span class="label">Tracking Code</span><span class="value mono">${pkg.trackingCode}</span></div>
+    <div class="row"><span class="label">Date</span><span class="value">${new Date().toLocaleString('en-KE', { dateStyle: 'medium', timeStyle: 'short' })}</span></div>
+    <div class="row"><span class="label">Item</span><span class="value">${pkg.description}</span></div>
+    <div class="row"><span class="label">Size</span><span class="value" style="text-transform:capitalize">${pkg.size || '—'}</span></div>
+    ${pkg.requestType === 'pickup_request' && pkg.collectFromName ? `<div class="row"><span class="label">Collect From</span><span class="value">${pkg.collectFromName}</span></div>` : ''}
+  </div>
+
+  <div class="section">
+    <div class="section-title">Route</div>
+    <div class="row"><span class="label">📍 Pickup</span><span class="value">${pkg.pickupAddress}</span></div>
+    <div class="row"><span class="label">🏠 Delivery</span><span class="value">${pkg.deliveryAddress}</span></div>
+    <div class="row"><span class="label">Zone</span><span class="value">${pkg.deliveryZone}</span></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Fee Breakdown</div>
+    <div class="row"><span class="label">Base Rate</span><span class="value">KES ${pkg.base}</span></div>
+    ${(pkg.protectionFee > 0) ? `<div class="row"><span class="label">Protection Fee</span><span class="value">KES ${pkg.protectionFee}</span></div>` : ''}
+  </div>
+
+  <div class="total-row">
+    <span class="label">Total Amount</span>
+    <span class="value">KES ${pkg.total}</span>
+  </div>
+
+  ${paid ? `
+  <div class="mpesa-section">
+    <div class="mpesa-title">📱 M-Pesa Payment Confirmed</div>
+    <div class="mpesa-row"><span class="label">Confirmation Code</span><span class="value">${mpesaCodeVal || pkg.mpesaCode || '—'}</span></div>
+    <div class="mpesa-row"><span class="label">Amount Paid</span><span class="value">KES ${pkg.total}</span></div>
+  </div>` : `
+  <div class="mpesa-section">
+    <div class="mpesa-title">📱 Pay via M-Pesa (if not yet paid)</div>
+    <div class="mpesa-row"><span class="label">Till Number</span><span class="value">${MPESA_TILL}</span></div>
+    <div class="mpesa-row"><span class="label">Business</span><span class="value">${MPESA_NAME}</span></div>
+    <div class="mpesa-row"><span class="label">Amount</span><span class="value">KES ${pkg.total}</span></div>
+    <div class="mpesa-row"><span class="label">Reference</span><span class="value">${pkg.trackingCode}</span></div>
+  </div>`}
+
+  ${pod ? `
+  <div class="pod-section">
+    <div class="pod-title">💵 Pay on Delivery</div>
+    <div class="pod-note">Payment of <strong>KES ${pkg.total}</strong> is due when the rider delivers your package. Please have cash or M-Pesa ready. Use tracking code <strong>${pkg.trackingCode}</strong> as reference if paying via M-Pesa to the rider.</div>
+  </div>` : ''}
+
+  <div class="footer">
+    <p><strong>Baruk Delivery</strong><br/>Fast. Reliable. Trackable.<br/>📞 0107129273<br/>baruk-app.vercel.app</p>
+  </div>
+</div>
+<div style="text-align:center;margin-top:16px">
+  <button onclick="window.print()" style="padding:12px 28px;background:#DC2626;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">🖨️ Print / Save as PDF</button>
+</div>
+</body>
+</html>`;
+  const w = window.open("", "_blank");
+  if (w) { w.document.write(html); w.document.close(); }
+};
+
+function CustomerApp({ packages, onCreatePackage, onUpdatePayment, transitLogs }) {
   const [view, setView]             = useState("track");
   const [orderType, setOrderType]   = useState("delivery"); // "delivery" | "pickup_request"
   const [form, setForm]             = useState({ pickupAddress: "", deliveryAddress: "", deliveryZone: ZONES[0], description: "", size: "small", declaredValue: "", collectFromName: "", collectFromPhone: "" });
@@ -392,11 +506,13 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
   };
 
   // Step 2 — customer pastes their M-Pesa confirmation code
-  const handleConfirmPayment = () => {
+  const handleConfirmPayment = async () => {
     setCodeError("");
     const code = mpesaCode.trim().toUpperCase();
-    // M-Pesa codes are 10 alphanumeric characters e.g. QHX4RT7K9P
     if (code.length < 8) return setCodeError("Please enter a valid M-Pesa confirmation code.");
+    if (pendingPkg) {
+      await onUpdatePayment(pendingPkg.id, "paid", code);
+    }
     setStage("done");
   };
 
@@ -491,37 +607,7 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em" }}>Order Summary</div>
             <button
-              onClick={() => {
-                const lines = [
-                  "BARUK DELIVERY — ORDER RECEIPT",
-                  "================================",
-                  `Date:          ${new Date().toLocaleString("en-KE")}`,
-                  `Tracking Code: ${pendingPkg.trackingCode}`,
-                  `Item:          ${pendingPkg.description}`,
-                  `Pickup:        ${pendingPkg.pickupAddress}`,
-                  `Delivery:      ${pendingPkg.deliveryAddress}`,
-                  `Zone:          ${pendingPkg.deliveryZone}`,
-                  "--------------------------------",
-                  `Base Fee:      KES ${pendingPkg.base}`,
-                  pendingPkg.protectionFee > 0 ? `Protection:    KES ${pendingPkg.protectionFee}` : null,
-                  `TOTAL DUE:     KES ${pendingPkg.total}`,
-                  "================================",
-                  "Pay via M-Pesa Lipa Na M-Pesa",
-                  `Till Number:   ${MPESA_TILL}`,
-                  `Business:      ${MPESA_NAME}`,
-                  `Reference:     ${pendingPkg.trackingCode}`,
-                  "================================",
-                  "Baruk Delivery — Fast. Reliable. Trackable.",
-                  "Contact: 0107129273",
-                ].filter(Boolean).join("\n");
-                const blob = new Blob([lines], { type: "text/plain" });
-                const url  = URL.createObjectURL(blob);
-                const a    = document.createElement("a");
-                a.href = url;
-                a.download = `Baruk-Receipt-${pendingPkg.trackingCode}.txt`;
-                a.click();
-                URL.revokeObjectURL(url);
-              }}
+              onClick={() => openReceipt(pendingPkg, mpesaCode)}
               style={{ display: "flex", alignItems: "center", gap: 5, background: "#F3F4F6", border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 700, color: "#374151", cursor: "pointer", fontFamily: "inherit" }}
             >
               ⬇️ Save Receipt
@@ -600,7 +686,7 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
             <span style={{ fontSize: 12, color: "#9CA3AF" }}>— or —</span>
           </div>
           <button
-            onClick={() => { setStage("form"); setView("track"); }}
+            onClick={async () => { if (pendingPkg) await onUpdatePayment(pendingPkg.id, "paid_on_delivery", ""); setStage("form"); setView("track"); }}
             style={{ width: "100%", padding: "14px", background: "#1F2937", border: "2px solid #374151", borderRadius: 12, cursor: "pointer", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}
           >
             <span style={{ fontSize: 15, fontWeight: 800, color: "#fff" }}>💵 Pay on Delivery</span>
@@ -825,8 +911,16 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
                     )}
 
                     <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, alignItems: "center" }}>
-                      <span style={{ fontSize: 12, color: "#6B7280" }}>KES {pkg.total}</span>
-                      <span style={{ fontSize: 12, color: "#DC2626", fontWeight: 700 }}>{isExpanded ? "▲ Less" : "▼ Details"}</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 12, color: "#6B7280" }}>KES {pkg.total}</span>
+                        {pkg.paymentStatus === "paid" && <span style={{ fontSize: 10, fontWeight: 800, color: "#065F46", background: "#D1FAE5", padding: "2px 8px", borderRadius: 20 }}>✅ PAID</span>}
+                        {pkg.paymentStatus === "paid_on_delivery" && <span style={{ fontSize: 10, fontWeight: 800, color: "#92400E", background: "#FEF3C7", padding: "2px 8px", borderRadius: 20 }}>💵 PAY ON DELIVERY</span>}
+                        {pkg.paymentStatus === "unpaid" && <span style={{ fontSize: 10, fontWeight: 800, color: "#DC2626", background: "#FEE2E2", padding: "2px 8px", borderRadius: 20 }}>⏳ UNPAID</span>}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <button onClick={e => { e.stopPropagation(); openReceipt(pkg); }} style={{ fontSize: 11, fontWeight: 700, color: "#DC2626", background: "none", border: "1px solid #FECACA", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit" }}>🧾 Invoice</button>
+                        <span style={{ fontSize: 12, color: "#DC2626", fontWeight: 700 }}>{isExpanded ? "▲ Less" : "▼ Details"}</span>
+                      </div>
                     </div>
                   </div>
 
@@ -965,6 +1059,17 @@ function RiderApp({ packages, onAcceptCollection, onConfirmCollection, onMarkAtW
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 12, color: "#9CA3AF" }}>
           <span>Zone: <strong style={{ color: "#374151" }}>{pkg.deliveryZone}</strong></span>
           <span>KES {pkg.declaredValue.toLocaleString()} value</span>
+        </div>
+        {/* Payment status for rider */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10, padding: "10px 12px", background: pkg.paymentStatus === "paid" ? "#F0FDF4" : pkg.paymentStatus === "paid_on_delivery" ? "#FFFBEB" : "#FEF2F2", borderRadius: 10, border: `1px solid ${pkg.paymentStatus === "paid" ? "#6EE7B7" : pkg.paymentStatus === "paid_on_delivery" ? "#FDE68A" : "#FECACA"}` }}>
+          <div>
+            {pkg.paymentStatus === "paid" && <div style={{ fontSize: 13, fontWeight: 800, color: "#065F46" }}>✅ Paid via M-Pesa</div>}
+            {pkg.paymentStatus === "paid_on_delivery" && <div style={{ fontSize: 13, fontWeight: 800, color: "#92400E" }}>💵 Pay on Delivery — KES {pkg.total}</div>}
+            {(pkg.paymentStatus === "unpaid" || !pkg.paymentStatus) && <div style={{ fontSize: 13, fontWeight: 800, color: "#DC2626" }}>⚠️ Not Paid — KES {pkg.total}</div>}
+            {pkg.paymentStatus === "paid_on_delivery" && <div style={{ fontSize: 11, color: "#78350F", marginTop: 2 }}>Collect KES {pkg.total} from customer on delivery</div>}
+            {(pkg.paymentStatus === "unpaid" || !pkg.paymentStatus) && <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 2 }}>Payment not yet confirmed</div>}
+          </div>
+          <button onClick={() => openReceipt(pkg)} style={{ fontSize: 11, fontWeight: 700, color: pkg.paymentStatus === "paid" ? "#065F46" : pkg.paymentStatus === "paid_on_delivery" ? "#92400E" : "#DC2626", background: "none", border: `1px solid ${pkg.paymentStatus === "paid" ? "#6EE7B7" : pkg.paymentStatus === "paid_on_delivery" ? "#FDE68A" : "#FECACA"}`, borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontFamily: "inherit" }}>🧾 Invoice</button>
         </div>
         {/* Sender contact for collection rider */}
         {isMyCollection && !isMyDelivery && pkg.status !== "searching_rider" && (() => {
@@ -1936,6 +2041,8 @@ const dbPkgToApp = (p) => ({
   requestType:            p.request_type || 'delivery',
   collectFromName:        p.collect_from_name || '',
   collectFromPhone:       p.collect_from_phone || '',
+  paymentStatus:          p.payment_status || 'unpaid',
+  mpesaCode:              p.mpesa_code || '',
   createdAt:              p.created_at,
 });
 
@@ -2521,6 +2628,8 @@ export default function App() {
     if (updates.riderDeliveryPhone     !== undefined) dbUpdates.rider_delivery_phone      = updates.riderDeliveryPhone;
     if (updates.otpWarehouseVerified   !== undefined) dbUpdates.otp_warehouse_verified    = updates.otpWarehouseVerified;
     if (updates.otpDeliveryVerified    !== undefined) dbUpdates.otp_delivery_verified     = updates.otpDeliveryVerified;
+    if (updates.paymentStatus          !== undefined) dbUpdates.payment_status            = updates.paymentStatus;
+    if (updates.mpesaCode              !== undefined) dbUpdates.mpesa_code                = updates.mpesaCode;
 
     console.log("[updatePkg] writing to DB:", { id, dbUpdates });
     const { data: updatedRow, error } = await supabase.from("packages").update(dbUpdates).eq("id", id).select().single();
@@ -2533,6 +2642,13 @@ export default function App() {
       // Force a fresh load with join to get rider name/phone/license
       await loadPackages();
     }
+  };
+
+  // ── Update payment status ──
+  const onUpdatePayment = async (pkgId, status, code) => {
+    const updates = { paymentStatus: status };
+    if (code) updates.mpesaCode = code;
+    await updatePkg(pkgId, updates);
   };
 
   // ── Create new package ──
@@ -2557,6 +2673,7 @@ export default function App() {
       collect_from_phone:     form.collectFromPhone || null,
       otp_warehouse:          isHighValue ? generateOTP() : null,
       otp_delivery:           isHighValue ? generateOTP() : null,
+      payment_status:         'unpaid',
     }).select().single();
     if (data) {
       const evtLabel = form.requestType === "pickup_request" ? "PICKUP_REQUESTED" : "ORDER_PLACED";
@@ -2688,7 +2805,7 @@ export default function App() {
   return (
     <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", background: "#F1F5F9", minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
       <TopBar />
-      {user.role === "customer" && <CustomerApp packages={packages.filter(p => p.customerId === user.id)} onCreatePackage={onCreatePackage} transitLogs={logs} />}
+      {user.role === "customer" && <CustomerApp packages={packages.filter(p => p.customerId === user.id)} onCreatePackage={onCreatePackage} onUpdatePayment={onUpdatePayment} transitLogs={logs} />}
       {user.role === "rider"    && <RiderApp packages={packages} onAcceptCollection={onAcceptCollection} onConfirmCollection={onConfirmCollection} onMarkAtWarehouse={onMarkAtWarehouse} onCollectedFromWarehouse={onCollectedFromWarehouse} onAcceptDelivery={onAcceptDelivery} onVerifyOTP={onVerifyOTP} onMarkDelivered={onMarkDelivered} transitLogs={logs} currentRider={user} customers={customers} />}
       {user.role === "admin"    && <AdminDashboard packages={packages} riders={riders} customers={customers} transitLogs={logs} onDispatch={onDispatch} onAcceptAtWarehouse={onAcceptAtWarehouse} onConfirmDelivery={onConfirmDelivery} onAddRider={onAddRider} accounts={[...riders, user]} onRefresh={loadPackages} />}
       <InstallBanner />
