@@ -459,7 +459,7 @@ const openReceipt = (pkg, mpesaCodeVal = "") => {
   </div>` : ''}
 
   <div class="footer">
-    <p><strong>Baruk Delivery</strong><br/>Fast. Reliable. Trackable.<br/>📞 0107129273<br/>baruk-app.vercel.app</p>
+    <p><strong>Baruk Delivery</strong><br/>Fast. Reliable. Trackable.<br/>📞 0107129273<br/>baruk.co.ke</p>
   </div>
 </div>
 <div style="text-align:center;margin-top:16px">
