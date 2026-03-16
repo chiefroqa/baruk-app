@@ -925,6 +925,13 @@ function CustomerApp({ packages, onCreatePackage, onUpdatePayment, transitLogs }
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <button onClick={e => { e.stopPropagation(); openReceipt(pkg); }} style={{ fontSize: 11, fontWeight: 700, color: "#DC2626", background: "none", border: "1px solid #FECACA", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit" }}>🧾 Invoice</button>
+                        <button onClick={e => {
+                          e.stopPropagation();
+                          const url = `${window.location.origin}${window.location.pathname}?track=${pkg.trackingCode}`;
+                          const msg = `Track your Baruk delivery live 👇\n${url}`;
+                          if (navigator.share) { navigator.share({ title: "Track your delivery", text: msg, url }); }
+                          else { const wa = `https://wa.me/?text=${encodeURIComponent(msg)}`; window.open(wa, "_blank"); }
+                        }} style={{ fontSize: 11, fontWeight: 700, color: "#0EA5E9", background: "none", border: "1px solid #BAE6FD", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit" }}>📤 Share</button>
                         <span style={{ fontSize: 12, color: "#DC2626", fontWeight: 700 }}>{isExpanded ? "▲ Less" : "▼ Details"}</span>
                       </div>
                     </div>
@@ -2065,6 +2072,194 @@ const dbLogToApp = (l) => ({
   createdAt:  l.created_at,
 });
 
+
+// ============================================================
+// PUBLIC TRACKING PAGE — no login required, for recipients
+// ============================================================
+function PublicTrackingPage({ trackingCode, onSignup }) {
+  const [pkg,     setPkg]     = useState(null);
+  const [logs,    setLogs]    = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState("");
+
+  useEffect(() => {
+    if (!trackingCode) return;
+    const load = async () => {
+      setLoading(true);
+      const { data: pkgData } = await supabase
+        .from("packages")
+        .select("*")
+        .eq("tracking_code", trackingCode.toUpperCase())
+        .single();
+
+      if (!pkgData) { setError("Tracking code not found. Please check and try again."); setLoading(false); return; }
+      setPkg(dbPkgToApp(pkgData));
+
+      const { data: logData } = await supabase
+        .from("transit_logs")
+        .select("*")
+        .eq("package_id", pkgData.id)
+        .order("created_at", { ascending: true });
+      if (logData) setLogs(logData.map(dbLogToApp));
+      setLoading(false);
+    };
+    load();
+
+    // Live updates via realtime
+    const channel = supabase.channel("public-track-" + trackingCode)
+      .on("postgres_changes", { event: "*", schema: "public", table: "packages" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "transit_logs" }, () => load())
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  }, [trackingCode]);
+
+  const steps = [
+    { key: "searching_rider",    label: "Searching for Rider",       icon: "🔍" },
+    { key: "awaiting_collection",label: "Rider En Route to Collect", icon: "🏍️" },
+    { key: "picked_up",          label: "Package Picked Up",         icon: "📦" },
+    { key: "pending_warehouse",  label: "Arriving at Hub",           icon: "🏭" },
+    { key: "at_warehouse",       label: "At Hub — Being Dispatched", icon: "✅" },
+    { key: "out_for_delivery",   label: "Out for Delivery",          icon: "🚀" },
+    { key: "pending_delivery",   label: "Delivered — Confirming",    icon: "📬" },
+    { key: "delivered",          label: "Delivered",                 icon: "🎉" },
+  ];
+
+  if (loading) return (
+    <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#F9FAFB", gap: 16, fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+      <div style={{ width: 56, height: 56, borderRadius: 16, background: "#DC2626", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>🏍️</div>
+      <div style={{ fontSize: 20, fontWeight: 900, color: "#DC2626" }}>Baruk</div>
+      <div style={{ width: 28, height: 28, border: "3px solid #FECACA", borderTopColor: "#DC2626", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+
+  if (error) return (
+    <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#F9FAFB", padding: 24, fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+      <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
+      <div style={{ fontSize: 18, fontWeight: 800, color: "#111827", marginBottom: 8, textAlign: "center" }}>Tracking code not found</div>
+      <div style={{ fontSize: 14, color: "#6B7280", textAlign: "center", marginBottom: 24 }}>{error}</div>
+      <div style={{ fontSize: 13, color: "#9CA3AF" }}>Double-check the code and try again, or contact <a href="tel:0107129273" style={{ color: "#DC2626", fontWeight: 700, textDecoration: "none" }}>0107129273</a></div>
+    </div>
+  );
+
+  const idx     = steps.findIndex(s => s.key === pkg.status);
+  const current = steps[idx] || steps[0];
+
+  return (
+    <div style={{ minHeight: "100dvh", background: "#F9FAFB", fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+
+      {/* Header */}
+      <div style={{ background: "#DC2626", padding: "20px 20px 24px", color: "#fff" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+          <div style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🏍️</div>
+          <span style={{ fontSize: 20, fontWeight: 900, letterSpacing: "-0.5px" }}>Baruk</span>
+          <span style={{ fontSize: 11, background: "rgba(255,255,255,0.2)", padding: "2px 10px", borderRadius: 20, fontWeight: 700, marginLeft: "auto" }}>LIVE TRACKING</span>
+        </div>
+
+        {/* Current status hero */}
+        <div style={{ background: "rgba(0,0,0,0.15)", borderRadius: 16, padding: "16px 18px" }}>
+          <div style={{ fontSize: 28, marginBottom: 8 }}>{current.icon}</div>
+          <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 4 }}>{current.label}</div>
+          <div style={{ fontSize: 13, fontFamily: "monospace", opacity: 0.85, fontWeight: 700 }}>{pkg.trackingCode}</div>
+          {pkg.status === "delivered" && (
+            <div style={{ marginTop: 10, background: "rgba(255,255,255,0.15)", borderRadius: 10, padding: "8px 12px", fontSize: 13, fontWeight: 600 }}>
+              🎉 Your package has been delivered!
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div style={{ padding: "20px 16px", maxWidth: 480, margin: "0 auto" }}>
+
+        {/* Rider info — shown once assigned */}
+        {pkg.riderCollectionName && pkg.status !== "searching_rider" && (
+          <div style={{ background: "#fff", borderRadius: 16, padding: "16px", marginBottom: 16, boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>
+              {pkg.status === "out_for_delivery" || pkg.status === "pending_delivery" || pkg.status === "delivered" ? "Your Delivery Rider" : "Coming to Collect"}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: "#111827" }}>🏍️ {pkg.riderCollectionName}</div>
+                {pkg.riderCollectionPhone && <div style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>{pkg.riderCollectionPhone}</div>}
+                {pkg.riderCollectionLicense && <div style={{ fontSize: 12, color: "#9CA3AF", marginTop: 1 }}>🪪 {pkg.riderCollectionLicense}</div>}
+              </div>
+              {pkg.riderCollectionPhone && (
+                <a href={"tel:" + pkg.riderCollectionPhone} style={{ background: "#DC2626", color: "#fff", padding: "10px 18px", borderRadius: 10, fontSize: 13, fontWeight: 700, textDecoration: "none" }}>📞 Call</a>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Delivery details */}
+        <div style={{ background: "#fff", borderRadius: 16, padding: "16px", marginBottom: 16, boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Delivery Details</div>
+          {[
+            ["📍 Pickup",   pkg.pickupAddress],
+            ["🏠 Delivery", pkg.deliveryAddress],
+            ["📦 Item",     pkg.description],
+          ].map(([label, value]) => (
+            <div key={label} style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+              <span style={{ fontSize: 13, color: "#9CA3AF", flexShrink: 0, width: 80 }}>{label}</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>{value}</span>
+            </div>
+          ))}
+          {/* Payment status */}
+          <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #F3F4F6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 13, color: "#6B7280" }}>Amount</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 15, fontWeight: 900, color: "#DC2626" }}>KES {pkg.total}</span>
+              {pkg.paymentStatus === "paid" && <span style={{ fontSize: 10, fontWeight: 800, color: "#065F46", background: "#D1FAE5", padding: "2px 8px", borderRadius: 20 }}>✅ PAID</span>}
+              {(pkg.paymentStatus === "paid_on_delivery" || pkg.paymentStatus === "pending" || pkg.paymentStatus === "unpaid") && <span style={{ fontSize: 10, fontWeight: 800, color: "#92400E", background: "#FEF3C7", padding: "2px 8px", borderRadius: 20 }}>💵 PAY ON DELIVERY</span>}
+            </div>
+          </div>
+        </div>
+
+        {/* Progress stepper */}
+        <div style={{ background: "#fff", borderRadius: 16, padding: "16px", marginBottom: 16, boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>Journey</div>
+          {steps.map((s, i) => {
+            const done = i < idx; const current = i === idx; const pending = i > idx;
+            return (
+              <div key={s.key} style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0, width: 28 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: "50%", background: done ? "#DC2626" : current ? "#DC2626" : "#E5E7EB", border: current ? "3px solid #FECACA" : "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: done ? 13 : 11, color: done || current ? "#fff" : "#9CA3AF", fontWeight: 700, boxShadow: current ? "0 0 0 4px rgba(220,38,38,0.15)" : "none" }}>
+                    {done ? "✓" : current ? s.icon : i + 1}
+                  </div>
+                  {i < steps.length - 1 && <div style={{ width: 2, height: 28, background: done ? "#DC2626" : "#E5E7EB", marginTop: 2 }} />}
+                </div>
+                <div style={{ paddingBottom: i < steps.length - 1 ? 16 : 0, paddingTop: 4 }}>
+                  <div style={{ fontSize: 13, fontWeight: current ? 800 : done ? 600 : 500, color: current ? "#DC2626" : done ? "#374151" : "#9CA3AF" }}>{s.label}</div>
+                  {current && <div style={{ fontSize: 11, color: "#EF4444", fontWeight: 600, marginTop: 2 }}>● Current status</div>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Chain of custody */}
+        {logs.length > 0 && (
+          <div style={{ background: "#fff", borderRadius: 16, padding: "16px", marginBottom: 24, boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>Chain of Custody</div>
+            <Timeline logs={logs} />
+          </div>
+        )}
+
+        {/* Signup CTA */}
+        <div style={{ background: "#0A0A0A", borderRadius: 20, padding: "24px 20px", textAlign: "center", marginBottom: 24 }}>
+          <div style={{ fontSize: 24, marginBottom: 10 }}>🏍️</div>
+          <div style={{ fontSize: 18, fontWeight: 900, color: "#fff", marginBottom: 6, letterSpacing: "-0.5px" }}>Send with Baruk</div>
+          <div style={{ fontSize: 13, color: "#9CA3AF", marginBottom: 16, lineHeight: 1.6 }}>Same-day delivery across Nairobi from KES 200. Track every step, just like this.</div>
+          <button onClick={onSignup} style={{ width: "100%", padding: "14px", background: "#DC2626", color: "#fff", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 4px 16px rgba(220,38,38,0.4)", marginBottom: 10 }}>
+            Create Free Account →
+          </button>
+          <a href="tel:0107129273" style={{ fontSize: 12, color: "#6B7280", textDecoration: "none" }}>or call us on <strong style={{ color: "#DC2626" }}>0107129273</strong></a>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
 // ============================================================
 // HOME PAGE
 // ============================================================
@@ -2525,7 +2720,10 @@ function InstallBanner() {
 // ============================================================
 export default function App() {
   const [user, setUser]         = useState(null);
-  const [authView, setAuthView] = useState("home");
+  // Check for public tracking link on load
+  const urlTrackCode = new URLSearchParams(window.location.search).get("track");
+  const [authView, setAuthView] = useState(urlTrackCode ? "track" : "home");
+  const [trackCode, setTrackCode] = useState(urlTrackCode || "");
   const [appLoading, setAppLoading] = useState(true);
   const [packages, setPackages] = useState([]);
   const [logs, setLogs]         = useState([]);
@@ -2788,10 +2986,13 @@ export default function App() {
   if (appLoading) return <LoadingScreen />;
 
   if (!user) {
+    if (authView === "track")  return <PublicTrackingPage trackingCode={trackCode} onSignup={() => setAuthView("signup")} />;
     if (authView === "signup") return <><SignupScreen onBack={() => setAuthView("home")} /><InstallBanner /></>;
     if (authView === "login")  return <><LoginScreen onGoSignup={() => setAuthView("home")} onBack={() => setAuthView("home")} /><InstallBanner /></>;
     return <><HomePage onSignup={() => setAuthView("signup")} onLogin={() => setAuthView("login")} /><InstallBanner /></>;
   }
+  // Also allow logged-in users to view public tracking page
+  if (authView === "track") return <PublicTrackingPage trackingCode={trackCode} onSignup={() => setAuthView("signup")} />;
 
   const TopBar = () => (
     <div style={{ background: "#111827", padding: "10px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, zIndex: 100 }}>
