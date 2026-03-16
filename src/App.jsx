@@ -486,9 +486,47 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
           ))}
         </div>
 
-        {/* Order summary */}
+        {/* Order summary + download receipt */}
         <Card style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Order Summary</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em" }}>Order Summary</div>
+            <button
+              onClick={() => {
+                const lines = [
+                  "BARUK DELIVERY — ORDER RECEIPT",
+                  "================================",
+                  `Date:          ${new Date().toLocaleString("en-KE")}`,
+                  `Tracking Code: ${pendingPkg.trackingCode}`,
+                  `Item:          ${pendingPkg.description}`,
+                  `Pickup:        ${pendingPkg.pickupAddress}`,
+                  `Delivery:      ${pendingPkg.deliveryAddress}`,
+                  `Zone:          ${pendingPkg.deliveryZone}`,
+                  "--------------------------------",
+                  `Base Fee:      KES ${pendingPkg.base}`,
+                  pendingPkg.protectionFee > 0 ? `Protection:    KES ${pendingPkg.protectionFee}` : null,
+                  `TOTAL DUE:     KES ${pendingPkg.total}`,
+                  "================================",
+                  "Pay via M-Pesa Lipa Na M-Pesa",
+                  `Till Number:   ${MPESA_TILL}`,
+                  `Business:      ${MPESA_NAME}`,
+                  `Reference:     ${pendingPkg.trackingCode}`,
+                  "================================",
+                  "Baruk Delivery — Fast. Reliable. Trackable.",
+                  "Contact: 0107129273",
+                ].filter(Boolean).join("\n");
+                const blob = new Blob([lines], { type: "text/plain" });
+                const url  = URL.createObjectURL(blob);
+                const a    = document.createElement("a");
+                a.href = url;
+                a.download = `Baruk-Receipt-${pendingPkg.trackingCode}.txt`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+              style={{ display: "flex", alignItems: "center", gap: 5, background: "#F3F4F6", border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 700, color: "#374151", cursor: "pointer", fontFamily: "inherit" }}
+            >
+              ⬇️ Save Receipt
+            </button>
+          </div>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
             <span style={{ fontSize: 13, color: "#6B7280" }}>Tracking</span>
             <span style={{ fontSize: 13, fontWeight: 800, color: "#111827", fontFamily: "monospace" }}>{pendingPkg.trackingCode}</span>
@@ -496,6 +534,14 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
             <span style={{ fontSize: 13, color: "#6B7280" }}>Item</span>
             <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{pendingPkg.description}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+            <span style={{ fontSize: 13, color: "#6B7280" }}>Pickup</span>
+            <span style={{ fontSize: 13, color: "#6B7280", textAlign: "right", maxWidth: 200 }}>{pendingPkg.pickupAddress}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+            <span style={{ fontSize: 13, color: "#6B7280" }}>Delivery</span>
+            <span style={{ fontSize: 13, color: "#6B7280", textAlign: "right", maxWidth: 200 }}>{pendingPkg.deliveryAddress}</span>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 8, borderTop: "1px solid #F3F4F6", marginTop: 8 }}>
             <span style={{ fontSize: 15, fontWeight: 800, color: "#111827" }}>Amount Due</span>
@@ -549,9 +595,16 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
           <Btn onClick={handleConfirmPayment} style={{ width: "100%", marginTop: 14 }} size="lg" disabled={!mpesaCode}>Confirm Payment</Btn>
         </Card>
 
-        <div style={{ textAlign: "center", marginTop: 16 }}>
-          <button onClick={() => { setStage("form"); setView("track"); }} style={{ fontSize: 13, color: "#9CA3AF", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
-            I'll pay later — track my order →
+        <div style={{ marginTop: 16 }}>
+          <div style={{ textAlign: "center", marginBottom: 10 }}>
+            <span style={{ fontSize: 12, color: "#9CA3AF" }}>— or —</span>
+          </div>
+          <button
+            onClick={() => { setStage("form"); setView("track"); }}
+            style={{ width: "100%", padding: "14px", background: "#1F2937", border: "2px solid #374151", borderRadius: 12, cursor: "pointer", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}
+          >
+            <span style={{ fontSize: 15, fontWeight: 800, color: "#fff" }}>💵 Pay on Delivery</span>
+            <span style={{ fontSize: 12, color: "#9CA3AF", fontWeight: 500 }}>Your order is confirmed — pay the rider when they arrive</span>
           </button>
         </div>
       </div>
@@ -709,7 +762,7 @@ function CustomerApp({ packages, onCreatePackage, transitLogs }) {
             </div>
 
             <Btn onClick={handleBook} style={{ width: "100%", marginTop: 16 }} size="lg" disabled={!canSubmit || submitting}>
-              {submitting ? "Booking..." : isPickup ? `Request Pickup — KES ${fees.total}` : `Book & Pay — KES ${fees.total}`}
+              {submitting ? "Booking..." : `Confirm Request — KES ${fees.total}`}
             </Btn>
           </div>
         ) : (
