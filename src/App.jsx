@@ -498,11 +498,17 @@ function CustomerApp({ packages, onCreatePackage, onUpdatePayment, transitLogs }
   const handleBook = async () => {
     if (!canSubmit) return;
     setSubmitting(true);
-    const pkg = await onCreatePackage({ ...form, requestType: orderType, paymentStatus: "pending" });
-    setPendingPkg(pkg);
-    setStage("payment");
-    setSubmitting(false);
-    resetForm();
+    try {
+      const pkg = await onCreatePackage({ ...form, requestType: orderType });
+      if (!pkg) { setSubmitting(false); return; }
+      setPendingPkg(pkg);
+      setStage("payment");
+      resetForm();
+    } catch (err) {
+      console.error("handleBook failed:", err);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // Step 2 — customer pastes their M-Pesa confirmation code
@@ -2673,7 +2679,6 @@ export default function App() {
       collect_from_phone:     form.collectFromPhone || null,
       otp_warehouse:          isHighValue ? generateOTP() : null,
       otp_delivery:           isHighValue ? generateOTP() : null,
-      payment_status:         'unpaid',
     }).select().single();
     if (data) {
       const evtLabel = form.requestType === "pickup_request" ? "PICKUP_REQUESTED" : "ORDER_PLACED";
