@@ -927,7 +927,7 @@ function CustomerApp({ packages, onCreatePackage, onUpdatePayment, transitLogs }
                         <button onClick={e => { e.stopPropagation(); openReceipt(pkg); }} style={{ fontSize: 11, fontWeight: 700, color: "#DC2626", background: "none", border: "1px solid #FECACA", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit" }}>🧾 Invoice</button>
                         <button onClick={e => {
                           e.stopPropagation();
-                          const url = `${window.location.origin}${window.location.pathname}?track=${pkg.trackingCode}`;
+                          const url = `https://baruk.co.ke/?track=${pkg.trackingCode}`;
                           const msg = `Track your Baruk delivery live 👇\n${url}`;
                           if (navigator.share) { navigator.share({ title: "Track your delivery", text: msg, url }); }
                           else { const wa = `https://wa.me/?text=${encodeURIComponent(msg)}`; window.open(wa, "_blank"); }
@@ -2086,12 +2086,13 @@ function PublicTrackingPage({ trackingCode, onSignup }) {
     if (!trackingCode) return;
     const load = async () => {
       setLoading(true);
-      const { data: pkgData } = await supabase
+      const { data: pkgData, error: pkgError } = await supabase
         .from("packages")
         .select("*")
-        .eq("tracking_code", trackingCode.toUpperCase())
-        .single();
+        .eq("tracking_code", trackingCode.toUpperCase().trim())
+        .maybeSingle();
 
+      if (pkgError) { console.error("Tracking query error:", pkgError); setError("Unable to load tracking info. This may be a permissions issue — contact 0107129273."); setLoading(false); return; }
       if (!pkgData) { setError("Tracking code not found. Please check and try again."); setLoading(false); return; }
       setPkg(dbPkgToApp(pkgData));
 
