@@ -361,7 +361,7 @@ const MPESA_NAME    = "Coral Crafts";
 // ── Opens a full-page printable receipt in a new tab ──────────────────────
 const openReceipt = (pkg, mpesaCodeVal = "") => {
   const paid = pkg.paymentStatus === "paid";
-  const pod  = pkg.paymentStatus === "paid_on_delivery" || pkg.paymentStatus === "unpaid";
+  const pod  = pkg.paymentStatus === "paid_on_delivery" || pkg.paymentStatus === "unpaid" || pkg.paymentStatus === "pending";
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -921,7 +921,7 @@ function CustomerApp({ packages, onCreatePackage, onUpdatePayment, transitLogs }
                         <span style={{ fontSize: 12, color: "#6B7280" }}>KES {pkg.total}</span>
                         {pkg.paymentStatus === "paid" && <span style={{ fontSize: 10, fontWeight: 800, color: "#065F46", background: "#D1FAE5", padding: "2px 8px", borderRadius: 20 }}>✅ PAID</span>}
                         {pkg.paymentStatus === "paid_on_delivery" && <span style={{ fontSize: 10, fontWeight: 800, color: "#92400E", background: "#FEF3C7", padding: "2px 8px", borderRadius: 20 }}>💵 PAY ON DELIVERY</span>}
-                        {pkg.paymentStatus === "unpaid" && <span style={{ fontSize: 10, fontWeight: 800, color: "#DC2626", background: "#FEE2E2", padding: "2px 8px", borderRadius: 20 }}>⏳ UNPAID</span>}
+                        {(pkg.paymentStatus === "unpaid" || pkg.paymentStatus === "pending") && <span style={{ fontSize: 10, fontWeight: 800, color: "#DC2626", background: "#FEE2E2", padding: "2px 8px", borderRadius: 20 }}>⏳ UNPAID</span>}
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <button onClick={e => { e.stopPropagation(); openReceipt(pkg); }} style={{ fontSize: 11, fontWeight: 700, color: "#DC2626", background: "none", border: "1px solid #FECACA", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit" }}>🧾 Invoice</button>
@@ -1071,9 +1071,9 @@ function RiderApp({ packages, onAcceptCollection, onConfirmCollection, onMarkAtW
           <div>
             {pkg.paymentStatus === "paid" && <div style={{ fontSize: 13, fontWeight: 800, color: "#065F46" }}>✅ Paid via M-Pesa</div>}
             {pkg.paymentStatus === "paid_on_delivery" && <div style={{ fontSize: 13, fontWeight: 800, color: "#92400E" }}>💵 Pay on Delivery — KES {pkg.total}</div>}
-            {(pkg.paymentStatus === "unpaid" || !pkg.paymentStatus) && <div style={{ fontSize: 13, fontWeight: 800, color: "#DC2626" }}>⚠️ Not Paid — KES {pkg.total}</div>}
+            {(pkg.paymentStatus === "unpaid" || pkg.paymentStatus === "pending" || !pkg.paymentStatus) && <div style={{ fontSize: 13, fontWeight: 800, color: "#DC2626" }}>⚠️ Not Paid — KES {pkg.total}</div>}
             {pkg.paymentStatus === "paid_on_delivery" && <div style={{ fontSize: 11, color: "#78350F", marginTop: 2 }}>Collect KES {pkg.total} from customer on delivery</div>}
-            {(pkg.paymentStatus === "unpaid" || !pkg.paymentStatus) && <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 2 }}>Payment not yet confirmed</div>}
+            {(pkg.paymentStatus === "unpaid" || pkg.paymentStatus === "pending" || !pkg.paymentStatus) && <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 2 }}>Payment not yet confirmed</div>}
           </div>
           <button onClick={() => openReceipt(pkg)} style={{ fontSize: 11, fontWeight: 700, color: pkg.paymentStatus === "paid" ? "#065F46" : pkg.paymentStatus === "paid_on_delivery" ? "#92400E" : "#DC2626", background: "none", border: `1px solid ${pkg.paymentStatus === "paid" ? "#6EE7B7" : pkg.paymentStatus === "paid_on_delivery" ? "#FDE68A" : "#FECACA"}`, borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontFamily: "inherit" }}>🧾 Invoice</button>
         </div>
@@ -2047,7 +2047,7 @@ const dbPkgToApp = (p) => ({
   requestType:            p.request_type || 'delivery',
   collectFromName:        p.collect_from_name || '',
   collectFromPhone:       p.collect_from_phone || '',
-  paymentStatus:          p.payment_status || 'unpaid',
+  paymentStatus:          p.payment_status || 'pending',
   mpesaCode:              p.mpesa_code || '',
   createdAt:              p.created_at,
 });
