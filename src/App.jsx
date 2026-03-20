@@ -16,7 +16,7 @@ create table users (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   phone text unique not null,
-  role text check (role in ('customer','rider','admin')) not null,
+  role text check (role in ('customer','rider','admin','distributor')) not null,
   home_zone text, -- for riders only
   created_at timestamptz default now()
 );
@@ -1013,6 +1013,490 @@ function CustomerApp({ packages, onCreatePackage, onUpdatePayment, transitLogs }
     </div>
   );
 }
+
+
+// ============================================================
+// DISTRIBUTOR APP
+// ============================================================
+function DistributorApp({ packages, onCreateBulkRun, onCreatePackage, onUpdatePayment, transitLogs, currentUser }) {
+  const [view, setView] = useState("runs");
+
+  // ── Address book (persisted in localStorage per user) ──────
+  const BOOK_KEY = `baruk_recipients_${currentUser?.id}`;
+  const [recipients, setRecipients] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(BOOK_KEY) || "[]"); } catch { return []; }
+  });
+  const saveRecipients = (list) => {
+    setRecipients(list);
+    localStorage.setItem(BOOK_KEY, JSON.stringify(list));
+  };
+
+  // ── New recipient form ──────────────────────────────────────
+  const blankRecipient = { name: "", contactName: "", phone: "", address: "", zone: ZONES[0] };
+  const [newRec, setNewRec]         = useState(blankRecipient);
+  const [showAddRec, setShowAddRec] = useState(false);
+
+  const saveNewRecipient = () => {
+    if (!newRec.name || !newRec.address) return;
+    const updated = [...recipients, { ...newRec, id: `rec-${Date.now()}` }];
+    saveRecipients(updated);
+    setNewRec(blankRecipient);
+    setShowAddRec(false);
+  };
+
+  // ── Build run ───────────────────────────────────────────────
+  const blankItem = (rec) => ({
+    id:            `item-${Date.now()}-${Math.random()}`,
+    recipientId:   rec?.id || "",
+    recipientName: rec?.name || "",
+    recipientPhone:rec?.phone || "",
+    deliveryAddress: rec?.address || "",
+    deliveryZone:  rec?.zone || ZONES[0],
+    contactName:   rec?.contactName || "",
+    description:   "",
+    size:          "small",
+    declaredValue: "",
+  });
+
+  const [runItems, setRunItems]       = useState([]);
+  const [pickupAddress, setPickup]    = useState("");
+  const [runStage, setRunStage]       = useState("build"); // build | review | submitting | done
+  const [completedRun, setCompletedRun] = useState([]);
+  const [expandedRun, setExpandedRun] = useState(null);
+
+  const addItemFromBook = (rec) => setRunItems(prev => [...prev, blankItem(rec)]);
+  const addBlankItem    = ()    => setRunItems(prev => [...prev, blankItem(null)]);
+  const removeItem      = (id)  => setRunItems(prev => prev.filter(i => i.id !== id));
+  const updateItem      = (id, field, val) =>
+    setRunItems(prev => prev.map(i => i.id === id ? { ...i, [field]: val } : i));
+
+  const runTotal = runItems.reduce((sum, item) => {
+    const { total } = calcFees(parseFloat(item.declaredValue) || 0, item.deliveryZone);
+    return sum + total;
+  }, 0);
+
+  const handleSubmitRun = async () => {
+    if (!pickupAddress || runItems.length === 0) return;
+    const valid = runItems.filter(i => i.deliveryAddress && i.description && i.recipientName);
+    if (valid.length !== runItems.length) return;
+    setRunStage("submitting");
+    try {
+      const results = await onCreateBulkRun(pickupAddress, valid);
+      setCompletedRun(results);
+      setRunItems([]);
+      setPickup("");
+      setRunStage("done");
+    } catch (err) {
+      console.error("Run failed:", err);
+      setRunStage("build");
+    }
+  };
+
+  // ── Group packages by day ───────────────────────────────────
+  const today = new Date().toDateString();
+  const todayPkgs = packages.filter(p => new Date(p.createdAt).toDateString() === today);
+  const allPkgs   = packages;
+
+  const statusColor = (s) => ({
+    searching_rider: "#F59E0B", awaiting_collection: "#0EA5E9",
+    picked_up: "#F87171", pending_warehouse: "#8B5CF6",
+    at_warehouse: "#6366F1", out_for_delivery: "#10B981",
+    pending_delivery: "#F97316", delivered: "#059669",
+  }[s] || "#9CA3AF");
+
+  // ── Render ──────────────────────────────────────────────────
+  return (
+    <div style={{ maxWidth: 600, margin: "0 auto", fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+
+      {/* Header */}
+      <div style={{ background: "#111827", padding: "20px 20px 0", borderRadius: "0 0 24px 24px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 900, color: "#fff", letterSpacing: "-0.5px" }}>🏢 Distribution</div>
+            <div style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>{currentUser?.name}</div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#DC2626" }}>{todayPkgs.length} today</div>
+            <div style={{ fontSize: 11, color: "#6B7280" }}>{allPkgs.length} total</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 2 }}>
+          {[["runs","📦 Runs"], ["book","📋 Recipients"], ["history","🕐 History"]].map(([v, l]) => (
+            <button key={v} onClick={() => setView(v)}
+              style={{ flex: 1, padding: "10px 4px", border: "none", background: view === v ? "#DC2626" : "transparent", color: view === v ? "#fff" : "rgba(255,255,255,0.55)", fontWeight: 700, borderRadius: "8px 8px 0 0", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>
+              {l}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ padding: "20px 16px" }}>
+
+        {/* ── RUNS VIEW ─────────────────────────────────────── */}
+        {view === "runs" && (
+
+          // Done screen
+          runStage === "done" ? (
+            <div>
+              <div style={{ textAlign: "center", padding: "24px 0 16px" }}>
+                <div style={{ fontSize: 56, marginBottom: 12 }}>🚀</div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: "#111827", marginBottom: 6 }}>Run Dispatched!</div>
+                <div style={{ fontSize: 14, color: "#6B7280", marginBottom: 20 }}>{completedRun.length} deliveries created and riders are being assigned.</div>
+              </div>
+              {/* Run summary cards */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
+                {completedRun.map(pkg => (
+                  <div key={pkg.id} style={{ background: "#fff", borderRadius: 12, padding: "12px 14px", boxShadow: "0 1px 4px rgba(0,0,0,0.07)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 700, color: "#DC2626" }}>{pkg.trackingCode}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#111827", marginTop: 2 }}>{pkg.recipientName}</div>
+                      <div style={{ fontSize: 12, color: "#9CA3AF" }}>{pkg.deliveryAddress}</div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: 14, fontWeight: 900, color: "#DC2626" }}>KES {pkg.total}</div>
+                      <button onClick={() => {
+                        const url = `https://baruk.co.ke?track=${pkg.trackingCode}`;
+                        const msg = `Track your delivery from ${currentUser?.name} 👇\n${url}`;
+                        if (navigator.share) navigator.share({ title: "Track your delivery", text: msg, url });
+                        else window.open(`https://wa.me/${pkg.recipientPhone?.replace(/\s/g,'')}?text=${encodeURIComponent(msg)}`, "_blank");
+                      }} style={{ fontSize: 11, fontWeight: 700, color: "#0EA5E9", background: "none", border: "1px solid #BAE6FD", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit", marginTop: 4 }}>
+                        📤 Notify
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => { setRunStage("build"); setCompletedRun([]); }}
+                style={{ width: "100%", padding: "13px", background: "#DC2626", color: "#fff", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+                + Start New Run
+              </button>
+            </div>
+
+          // Review screen
+          ) : runStage === "review" ? (
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+                <button onClick={() => setRunStage("build")} style={{ background: "#F3F4F6", border: "none", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "inherit" }}>← Back</button>
+                <div style={{ fontSize: 18, fontWeight: 900, color: "#111827" }}>Review Run</div>
+              </div>
+
+              <div style={{ background: "#fff", borderRadius: 14, padding: "14px 16px", marginBottom: 14, boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Pickup From</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>📍 {pickupAddress}</div>
+              </div>
+
+              {runItems.map((item, i) => {
+                const { total } = calcFees(parseFloat(item.declaredValue) || 0, item.deliveryZone);
+                return (
+                  <div key={item.id} style={{ background: "#fff", borderRadius: 12, padding: "12px 14px", marginBottom: 10, boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: "#111827" }}>{i + 1}. {item.recipientName}</div>
+                        {item.contactName && <div style={{ fontSize: 12, color: "#6B7280" }}>Attn: {item.contactName}</div>}
+                        <div style={{ fontSize: 12, color: "#6B7280" }}>{item.deliveryAddress} · {item.deliveryZone}</div>
+                        <div style={{ fontSize: 12, color: "#374151", marginTop: 3 }}>📦 {item.description} ({item.size})</div>
+                      </div>
+                      <div style={{ textAlign: "right", flexShrink: 0 }}>
+                        <div style={{ fontSize: 15, fontWeight: 900, color: "#DC2626" }}>KES {total}</div>
+                        {item.declaredValue > 0 && <div style={{ fontSize: 11, color: "#9CA3AF" }}>val: KES {item.declaredValue}</div>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              <div style={{ background: "#FEF2F2", border: "1.5px solid #FECACA", borderRadius: 12, padding: "14px 16px", marginBottom: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: 13, color: "#6B7280" }}>{runItems.length} deliveries</div>
+                    <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 2 }}>Riders assigned automatically per zone</div>
+                  </div>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: "#DC2626" }}>KES {runTotal.toLocaleString()}</div>
+                </div>
+              </div>
+
+              <button onClick={handleSubmitRun}
+                style={{ width: "100%", padding: "14px", background: "#DC2626", color: "#fff", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+                🚀 Confirm & Dispatch All {runItems.length} Deliveries
+              </button>
+            </div>
+
+          // Submitting
+          ) : runStage === "submitting" ? (
+            <div style={{ textAlign: "center", padding: "60px 20px" }}>
+              <div style={{ fontSize: 48, marginBottom: 16 }}>⏳</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: "#111827", marginBottom: 8 }}>Creating {runItems.length} deliveries…</div>
+              <div style={{ fontSize: 13, color: "#9CA3AF" }}>Please wait, do not close this screen</div>
+            </div>
+
+          // Build screen
+          ) : (
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                <div style={{ fontSize: 18, fontWeight: 900, color: "#111827" }}>New Distribution Run</div>
+                <div style={{ fontSize: 12, color: "#9CA3AF" }}>{runItems.length} stop{runItems.length !== 1 ? "s" : ""}</div>
+              </div>
+
+              {/* Pickup address */}
+              <div style={{ background: "#fff", borderRadius: 14, padding: "14px 16px", marginBottom: 16, boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>📍 Pickup / Dispatch Address</div>
+                <input
+                  value={pickupAddress} onChange={e => setPickup(e.target.value)}
+                  placeholder="Your warehouse, store or dispatch point"
+                  style={{ width: "100%", padding: "10px 12px", border: "1.5px solid #E5E7EB", borderRadius: 10, fontSize: 14, fontFamily: "inherit", boxSizing: "border-box", outline: "none", color: "#111827" }}
+                  onFocus={e => e.target.style.borderColor = "#DC2626"}
+                  onBlur={e => e.target.style.borderColor = "#E5E7EB"}
+                />
+              </div>
+
+              {/* Quick-add from address book */}
+              {recipients.length > 0 && (
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Add from Recipients</div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {recipients.map(rec => (
+                      <button key={rec.id} onClick={() => addItemFromBook(rec)}
+                        style={{ padding: "6px 14px", background: "#F3F4F6", border: "1px solid #E5E7EB", borderRadius: 20, fontSize: 12, fontWeight: 700, color: "#374151", cursor: "pointer", fontFamily: "inherit" }}>
+                        + {rec.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Run items */}
+              {runItems.map((item, i) => {
+                const { total } = calcFees(parseFloat(item.declaredValue) || 0, item.deliveryZone);
+                return (
+                  <div key={item.id} style={{ background: "#fff", borderRadius: 14, padding: "14px 16px", marginBottom: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1.5px solid #F3F4F6" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: "#DC2626" }}>Stop {i + 1}</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 13, fontWeight: 800, color: "#111827" }}>KES {total}</span>
+                        <button onClick={() => removeItem(item.id)} style={{ background: "none", border: "none", fontSize: 16, color: "#9CA3AF", cursor: "pointer", padding: "2px 4px" }}>✕</button>
+                      </div>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                      {[
+                        { label: "Recipient / Branch", field: "recipientName", placeholder: "e.g. Westlands Pharmacy", full: true },
+                        { label: "Contact Person", field: "contactName", placeholder: "e.g. James Mwangi" },
+                        { label: "Phone", field: "recipientPhone", placeholder: "07XX XXX XXX", type: "tel" },
+                        { label: "Delivery Address", field: "deliveryAddress", placeholder: "Full address", full: true },
+                        { label: "What to deliver", field: "description", placeholder: "e.g. Pharmaceuticals, Eyewear", full: true },
+                        { label: "Declared Value (KES)", field: "declaredValue", placeholder: "0", type: "number" },
+                      ].map(f => (
+                        <div key={f.field} style={{ gridColumn: f.full ? "1 / -1" : undefined }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>{f.label}</div>
+                          <input
+                            type={f.type || "text"} value={item[f.field]} placeholder={f.placeholder}
+                            onChange={e => updateItem(item.id, f.field, e.target.value)}
+                            style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #E5E7EB", borderRadius: 9, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box", outline: "none", color: "#111827" }}
+                            onFocus={e => e.target.style.borderColor = "#DC2626"}
+                            onBlur={e => e.target.style.borderColor = "#E5E7EB"}
+                          />
+                        </div>
+                      ))}
+                      {/* Zone picker */}
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>Delivery Zone</div>
+                        <select value={item.deliveryZone} onChange={e => updateItem(item.id, "deliveryZone", e.target.value)}
+                          style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #E5E7EB", borderRadius: 9, fontSize: 13, fontFamily: "inherit", color: "#111827", background: "#fff", boxSizing: "border-box" }}>
+                          {ZONE_GROUPS.map(group => (
+                            <optgroup key={group.tier} label={`${group.label} — KES ${group.price}`}>
+                              {group.zones.map(z => <option key={z} value={z}>{z}</option>)}
+                            </optgroup>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Add stop buttons */}
+              <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
+                <button onClick={addBlankItem}
+                  style={{ flex: 1, padding: "12px", background: "#F9FAFB", border: "1.5px dashed #E5E7EB", borderRadius: 12, fontSize: 13, fontWeight: 700, color: "#6B7280", cursor: "pointer", fontFamily: "inherit" }}>
+                  + Add Stop
+                </button>
+                <button onClick={() => setView("book")}
+                  style={{ flex: 1, padding: "12px", background: "#F9FAFB", border: "1.5px dashed #FECACA", borderRadius: 12, fontSize: 13, fontWeight: 700, color: "#DC2626", cursor: "pointer", fontFamily: "inherit" }}>
+                  + From Address Book
+                </button>
+              </div>
+
+              {/* Total + review */}
+              {runItems.length > 0 && pickupAddress && (
+                <div style={{ background: "#FEF2F2", border: "1.5px solid #FECACA", borderRadius: 14, padding: "14px 16px", marginBottom: 12 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>{runItems.length} stops</div>
+                      <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 2 }}>Total delivery cost</div>
+                    </div>
+                    <div style={{ fontSize: 22, fontWeight: 900, color: "#DC2626" }}>KES {runTotal.toLocaleString()}</div>
+                  </div>
+                </div>
+              )}
+
+              {runItems.length > 0 && pickupAddress && runItems.every(i => i.recipientName && i.deliveryAddress && i.description) && (
+                <button onClick={() => setRunStage("review")}
+                  style={{ width: "100%", padding: "14px", background: "#DC2626", color: "#fff", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", marginBottom: 8 }}>
+                  Review Run — {runItems.length} Deliveries →
+                </button>
+              )}
+
+              {runItems.length === 0 && (
+                <div style={{ textAlign: "center", padding: "32px 20px", background: "#fff", borderRadius: 16, boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
+                  <div style={{ fontSize: 40, marginBottom: 10 }}>📦</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: "#374151", marginBottom: 6 }}>Start your distribution run</div>
+                  <div style={{ fontSize: 13, color: "#9CA3AF" }}>Add stops from your address book or tap + Add Stop to add manually</div>
+                </div>
+              )}
+            </div>
+          )
+        )}
+
+        {/* ── ADDRESS BOOK ──────────────────────────────────── */}
+        {view === "book" && (
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div style={{ fontSize: 18, fontWeight: 900, color: "#111827" }}>Recipients ({recipients.length})</div>
+              <button onClick={() => setShowAddRec(s => !s)}
+                style={{ padding: "7px 16px", background: showAddRec ? "#F3F4F6" : "#DC2626", color: showAddRec ? "#374151" : "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                {showAddRec ? "✕ Cancel" : "+ Add Recipient"}
+              </button>
+            </div>
+
+            {/* Add new recipient form */}
+            {showAddRec && (
+              <div style={{ background: "#fff", borderRadius: 14, padding: "16px", marginBottom: 16, boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1.5px solid #FECACA" }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: "#111827", marginBottom: 14 }}>New Recipient</div>
+                {[
+                  { label: "Business / Branch Name", key: "name", placeholder: "e.g. Westlands Pharmacy" },
+                  { label: "Contact Person", key: "contactName", placeholder: "e.g. James Mwangi" },
+                  { label: "Phone", key: "phone", placeholder: "07XX XXX XXX" },
+                  { label: "Delivery Address", key: "address", placeholder: "Full street address" },
+                ].map(f => (
+                  <div key={f.key} style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.06em" }}>{f.label}</div>
+                    <input value={newRec[f.key]} onChange={e => setNewRec(r => ({ ...r, [f.key]: e.target.value }))}
+                      placeholder={f.placeholder}
+                      style={{ width: "100%", padding: "10px 12px", border: "1.5px solid #E5E7EB", borderRadius: 10, fontSize: 14, fontFamily: "inherit", boxSizing: "border-box", outline: "none", color: "#111827" }}
+                      onFocus={e => e.target.style.borderColor = "#DC2626"}
+                      onBlur={e => e.target.style.borderColor = "#E5E7EB"}
+                    />
+                  </div>
+                ))}
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.06em" }}>Default Zone</div>
+                  <select value={newRec.zone} onChange={e => setNewRec(r => ({ ...r, zone: e.target.value }))}
+                    style={{ width: "100%", padding: "10px 12px", border: "1.5px solid #E5E7EB", borderRadius: 10, fontSize: 14, fontFamily: "inherit", color: "#111827", background: "#fff", boxSizing: "border-box" }}>
+                    {ZONES.map(z => <option key={z} value={z}>{z}</option>)}
+                  </select>
+                </div>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button onClick={saveNewRecipient} disabled={!newRec.name || !newRec.address}
+                    style={{ flex: 1, padding: "11px", background: !newRec.name || !newRec.address ? "#FCA5A5" : "#DC2626", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+                    Save Recipient
+                  </button>
+                  <button onClick={() => { setShowAddRec(false); setNewRec(blankRecipient); }}
+                    style={{ padding: "11px 20px", background: "#F3F4F6", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, color: "#374151", cursor: "pointer", fontFamily: "inherit" }}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Recipient list */}
+            {recipients.length === 0 && !showAddRec ? (
+              <div style={{ textAlign: "center", padding: "40px 20px", background: "#fff", borderRadius: 16, boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
+                <div style={{ fontSize: 40, marginBottom: 10 }}>📋</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#374151", marginBottom: 6 }}>No recipients yet</div>
+                <div style={{ fontSize: 13, color: "#9CA3AF" }}>Add your chemists, branches, or regular delivery points here and they'll appear as quick-add options when building runs.</div>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {recipients.map(rec => (
+                  <div key={rec.id} style={{ background: "#fff", borderRadius: 14, padding: "14px 16px", boxShadow: "0 1px 4px rgba(0,0,0,0.07)", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: "#111827" }}>{rec.name}</div>
+                      {rec.contactName && <div style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>👤 {rec.contactName}</div>}
+                      {rec.phone && <div style={{ fontSize: 12, color: "#6B7280" }}>📞 {rec.phone}</div>}
+                      <div style={{ fontSize: 12, color: "#9CA3AF", marginTop: 2 }}>📍 {rec.address}</div>
+                      <div style={{ fontSize: 11, background: "#FEF2F2", color: "#DC2626", padding: "2px 8px", borderRadius: 10, fontWeight: 700, display: "inline-block", marginTop: 4 }}>{rec.zone}</div>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+                      <button onClick={() => { addItemFromBook(rec); setView("runs"); }}
+                        style={{ padding: "5px 12px", background: "#DC2626", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                        + Add to Run
+                      </button>
+                      <button onClick={() => saveRecipients(recipients.filter(r => r.id !== rec.id))}
+                        style={{ padding: "5px 12px", background: "#F3F4F6", color: "#9CA3AF", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── HISTORY ───────────────────────────────────────── */}
+        {view === "history" && (
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 900, color: "#111827", marginBottom: 16 }}>Delivery History</div>
+            {allPkgs.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "40px 20px", background: "#fff", borderRadius: 16, boxShadow: "0 1px 4px rgba(0,0,0,0.07)" }}>
+                <div style={{ fontSize: 40, marginBottom: 10 }}>🕐</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#374151" }}>No deliveries yet</div>
+              </div>
+            ) : (
+              allPkgs.map(pkg => (
+                <div key={pkg.id} style={{ background: "#fff", borderRadius: 14, marginBottom: 10, boxShadow: "0 1px 4px rgba(0,0,0,0.07)", overflow: "hidden" }}>
+                  <div onClick={() => setExpandedRun(expandedRun === pkg.id ? null : pkg.id)}
+                    style={{ padding: "14px 16px", cursor: "pointer" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div>
+                        <div style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 700, color: "#DC2626" }}>{pkg.trackingCode}</div>
+                        <div style={{ fontSize: 14, fontWeight: 800, color: "#111827", marginTop: 2 }}>{pkg.recipientName || pkg.deliveryAddress}</div>
+                        <div style={{ fontSize: 12, color: "#9CA3AF" }}>{pkg.description} · {pkg.deliveryZone}</div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ width: 10, height: 10, borderRadius: "50%", background: statusColor(pkg.status), marginLeft: "auto", marginBottom: 4 }} />
+                        <div style={{ fontSize: 11, color: "#6B7280", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>{pkg.status.replace(/_/g, " ")}</div>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: "#DC2626", marginTop: 2 }}>KES {pkg.total}</div>
+                      </div>
+                    </div>
+                  </div>
+                  {expandedRun === pkg.id && (
+                    <div style={{ padding: "0 16px 16px", borderTop: "1px solid #F3F4F6" }}>
+                      <div style={{ paddingTop: 12, fontSize: 12, color: "#6B7280", marginBottom: 10 }}>
+                        {new Date(pkg.createdAt).toLocaleString("en-KE")}
+                      </div>
+                      <Timeline logs={transitLogs.filter(l => l.packageId === pkg.id)} />
+                      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                        <button onClick={() => openReceipt(pkg)} style={{ flex: 1, padding: "8px", background: "#F3F4F6", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, color: "#374151", cursor: "pointer", fontFamily: "inherit" }}>🧾 Invoice</button>
+                        <button onClick={() => {
+                          const url = `https://baruk.co.ke?track=${pkg.trackingCode}`;
+                          const msg = `Track your delivery from ${currentUser?.name} 👇\n${url}`;
+                          if (navigator.share) navigator.share({ title: "Track", text: msg, url });
+                          else window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+                        }} style={{ flex: 1, padding: "8px", background: "#F0F9FF", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, color: "#0EA5E9", cursor: "pointer", fontFamily: "inherit" }}>📤 Share Tracking</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
 
 // ============================================================
 // RIDER APP
@@ -2371,10 +2855,160 @@ function HomePage({ onSignup, onLogin }) {
             </div>
           ))}
         </div>
+
+        {/* Pricing strip */}
+        <div className="hp-fadein-4" style={{ marginTop: 32, background: "#111", border: "1px solid #1e1e1e", borderRadius: 16, padding: "14px 20px" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.1em", textAlign: "center", marginBottom: 12 }}>Flat rates · No hidden fees</div>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+            {[
+              { zone: "CBD & Inner", price: "KES 200", eg: "Westlands, Kilimani, South C" },
+              { zone: "Mid Nairobi", price: "KES 250", eg: "Kasarani, Karen, Umoja" },
+              { zone: "Outer Areas", price: "KES 300", eg: "Rongai, Ruiru, Kitengela" },
+            ].map(({ zone, price, eg }) => (
+              <div key={zone} style={{ flex: 1, textAlign: "center", padding: "10px 6px", background: "#0A0A0A", borderRadius: 10, border: "1px solid #1e1e1e" }}>
+                <div style={{ fontSize: 18, fontWeight: 900, color: "#DC2626", letterSpacing: "-0.5px" }}>{price}</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#fff", marginTop: 3 }}>{zone}</div>
+                <div style={{ fontSize: 10, color: "#4B5563", marginTop: 2, lineHeight: 1.4 }}>{eg}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* SEE IT IN ACTION */}
+      <div style={{ padding: "40px 24px 0" }}>
+        <div style={{ textAlign: "center", marginBottom: 28 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#DC2626", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 10 }}>See it in action</div>
+          <div style={{ fontSize: 22, fontWeight: 900, color: "#fff", letterSpacing: "-0.5px", marginBottom: 8 }}>Your deliveries, fully visible</div>
+          <div style={{ fontSize: 14, color: "#6B7280", lineHeight: 1.6 }}>Track every step. Know your rider. Every handoff recorded.</div>
+        </div>
+
+        {/* Phone mockup container — scrolls horizontally on mobile */}
+        <div style={{ display: "flex", gap: 16, overflowX: "auto", paddingBottom: 8, scrollSnapType: "x mandatory" }}>
+
+          {/* MOCKUP 1: My Orders card */}
+          <div style={{ flexShrink: 0, width: 280, scrollSnapAlign: "start" }}>
+            <div style={{ background: "#111", border: "1px solid #1e1e1e", borderRadius: 20, overflow: "hidden" }}>
+              {/* Phone top bar */}
+              <div style={{ background: "#DC2626", padding: "10px 14px 0" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.7)", marginBottom: 6 }}>Baruk · Fast. Reliable. Trackable.</div>
+                <div style={{ display: "flex", gap: 2 }}>
+                  {["📦 My Orders", "+ Send", "🛵 Pickup"].map((t, i) => (
+                    <div key={t} style={{ flex: 1, padding: "7px 4px", background: i === 0 ? "rgba(255,255,255,0.2)" : "transparent", borderRadius: "6px 6px 0 0", fontSize: 10, fontWeight: 700, color: i === 0 ? "#fff" : "rgba(255,255,255,0.5)", textAlign: "center" }}>{t}</div>
+                  ))}
+                </div>
+              </div>
+              {/* Order cards */}
+              <div style={{ padding: "12px 10px", display: "flex", flexDirection: "column", gap: 8 }}>
+                {[
+                  { code: "BRK-N6LKUX", desc: "Prescription Glasses", dest: "Westlands Optician", status: "DELIVERED", statusColor: "#059669", statusBg: "#D1FAE5", rider: "James Kamau", plate: "KBZ 123X", payment: "✅ PAID" },
+                  { code: "BRK-MQ78KM", desc: "Pharmaceutical Stock", dest: "Karen Pharmacy", status: "OUT FOR DELIVERY", statusColor: "#10B981", statusBg: "#D1FAE5", rider: "Faith Wanjiru", plate: "KDD 456Y", payment: "💵 PAY ON DELIVERY" },
+                ].map(pkg => (
+                  <div key={pkg.code} style={{ background: "#1a1a1a", borderRadius: 12, padding: "10px 12px", border: "1px solid #2a2a2a" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                      <div>
+                        <div style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 700, color: "#DC2626" }}>{pkg.code}</div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", marginTop: 2 }}>{pkg.desc}</div>
+                        <div style={{ fontSize: 11, color: "#6B7280" }}>→ {pkg.dest}</div>
+                      </div>
+                      <div style={{ fontSize: 9, fontWeight: 800, color: pkg.statusColor, background: pkg.statusBg, padding: "2px 6px", borderRadius: 10, flexShrink: 0, marginLeft: 6 }}>{pkg.status}</div>
+                    </div>
+                    {/* Rider pill */}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(220,38,38,0.1)", border: "1px solid rgba(220,38,38,0.2)", borderRadius: 8, padding: "5px 8px" }}>
+                      <div>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#DC2626" }}>🏍️ {pkg.rider}</div>
+                        <div style={{ fontSize: 10, color: "#6B7280" }}>🪪 {pkg.plate}</div>
+                      </div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#fff", background: "#DC2626", padding: "3px 8px", borderRadius: 6 }}>📞 Call</div>
+                    </div>
+                    {/* Payment badge */}
+                    <div style={{ marginTop: 6, fontSize: 10, fontWeight: 700, color: pkg.payment.includes("PAID") && !pkg.payment.includes("DELIVERY") ? "#065F46" : "#92400E", background: pkg.payment.includes("PAID") && !pkg.payment.includes("DELIVERY") ? "#D1FAE5" : "#FEF3C7", padding: "3px 8px", borderRadius: 8, display: "inline-block" }}>{pkg.payment}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={{ fontSize: 11, color: "#4B5563", textAlign: "center", marginTop: 10, fontWeight: 600 }}>Your deliveries + rider details</div>
+          </div>
+
+          {/* MOCKUP 2: Chain of custody */}
+          <div style={{ flexShrink: 0, width: 280, scrollSnapAlign: "start" }}>
+            <div style={{ background: "#111", border: "1px solid #1e1e1e", borderRadius: 20, overflow: "hidden" }}>
+              <div style={{ background: "#1a1a1a", padding: "12px 14px", borderBottom: "1px solid #2a2a2a" }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: "#fff", marginBottom: 2 }}>Chain of Custody</div>
+                <div style={{ fontSize: 11, fontFamily: "monospace", color: "#DC2626" }}>BRK-N6LKUX</div>
+              </div>
+              <div style={{ padding: "12px 14px" }}>
+                {[
+                  { event: "ORDER PLACED",          actor: "Ismael gode",  loc: "Kilimani",         note: "Booking confirmed — KES 200",                       color: "#DC2626" },
+                  { event: "ACCEPTED ORDER",         actor: "James Kamau",  loc: "Kilimani",         note: "James accepted — heading to collect",               color: "#0EA5E9" },
+                  { event: "COLLECTED FROM CUSTOMER",actor: "James Kamau",  loc: "Kilimani",         note: "Package physically collected from sender",          color: "#F59E0B" },
+                  { event: "ARRIVED AT WAREHOUSE",   actor: "James Kamau",  loc: "Baruk Central",    note: "Awaiting warehouse acceptance",                     color: "#8B5CF6" },
+                  { event: "WAREHOUSE ACCEPTED",     actor: "chrismoegi",   loc: "Baruk Central",    note: "Condition verified — accepted at hub",              color: "#6366F1" },
+                  { event: "DISPATCHED TO RIDER",    actor: "chrismoegi",   loc: "Baruk Central",    note: "Assigned to James — awaiting collection",           color: "#0EA5E9" },
+                  { event: "DELIVERY CONFIRMED",     actor: "chrismoegi",   loc: "Westlands",        note: "Delivery confirmed by admin",                       color: "#059669" },
+                ].map((log, i, arr) => (
+                  <div key={i} style={{ display: "flex", gap: 10, marginBottom: i < arr.length - 1 ? 0 : 0 }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0, width: 16 }}>
+                      <div style={{ width: 10, height: 10, borderRadius: "50%", background: log.color, flexShrink: 0, marginTop: 3 }} />
+                      {i < arr.length - 1 && <div style={{ width: 2, flex: 1, background: "#2a2a2a", margin: "2px 0" }} />}
+                    </div>
+                    <div style={{ paddingBottom: i < arr.length - 1 ? 12 : 0 }}>
+                      <div style={{ fontSize: 10, fontWeight: 800, color: "#fff", letterSpacing: "0.02em" }}>{log.event}</div>
+                      <div style={{ fontSize: 10, color: "#6B7280" }}>{log.actor} · {log.loc}</div>
+                      <div style={{ fontSize: 10, color: log.color, fontStyle: "italic", marginTop: 1 }}>"{log.note}"</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={{ fontSize: 11, color: "#4B5563", textAlign: "center", marginTop: 10, fontWeight: 600 }}>Every handoff, permanently recorded</div>
+          </div>
+
+          {/* MOCKUP 3: Rider view */}
+          <div style={{ flexShrink: 0, width: 280, scrollSnapAlign: "start" }}>
+            <div style={{ background: "#111", border: "1px solid #1e1e1e", borderRadius: 20, overflow: "hidden" }}>
+              <div style={{ background: "#1F2937", padding: "12px 14px 0" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>Baruk Rider</div>
+                    <div style={{ fontSize: 11, color: "#9CA3AF" }}>👋 James Kamau</div>
+                  </div>
+                  <div style={{ background: "#DC2626", color: "#fff", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>📍 Westlands</div>
+                </div>
+                <div style={{ display: "flex", gap: 2 }}>
+                  {["📦 Collect 2", "🚀 Deliver", "⚡ Active"].map((t, i) => (
+                    <div key={t} style={{ flex: 1, padding: "6px 2px", background: i === 0 ? "rgba(255,255,255,0.15)" : "transparent", borderRadius: "6px 6px 0 0", fontSize: 9, fontWeight: 700, color: i === 0 ? "#fff" : "rgba(255,255,255,0.4)", textAlign: "center" }}>{t}</div>
+                  ))}
+                </div>
+              </div>
+              <div style={{ padding: "12px 10px" }}>
+                <div style={{ background: "#1a1a1a", border: "1px solid #2a2a2a", borderRadius: 12, padding: "10px 12px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                    <div style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 700, color: "#DC2626" }}>BRK-AB12CD</div>
+                    <div style={{ fontSize: 9, background: "#FEF3C7", color: "#92400E", padding: "2px 6px", borderRadius: 8, fontWeight: 800 }}>SEARCHING</div>
+                  </div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", marginBottom: 4 }}>Pharmaceutical Stock</div>
+                  <div style={{ fontSize: 11, color: "#6B7280", marginBottom: 8 }}>📍 Westlands · 🏠 Karen Pharmacy</div>
+                  {/* Payment status */}
+                  <div style={{ background: "rgba(249,115,22,0.15)", border: "1px solid rgba(249,115,22,0.3)", borderRadius: 8, padding: "6px 10px", marginBottom: 8 }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: "#F97316" }}>💵 Pay on Delivery — KES 250</div>
+                    <div style={{ fontSize: 10, color: "#9CA3AF", marginTop: 1 }}>Collect KES 250 from customer on delivery</div>
+                  </div>
+                  <div style={{ background: "#DC2626", borderRadius: 8, padding: "8px", textAlign: "center", fontSize: 12, fontWeight: 800, color: "#fff" }}>✅ Accept Order</div>
+                </div>
+              </div>
+            </div>
+            <div style={{ fontSize: 11, color: "#4B5563", textAlign: "center", marginTop: 10, fontWeight: 600 }}>Rider sees payment status instantly</div>
+          </div>
+
+        </div>
+
+        {/* Swipe hint on mobile */}
+        <div style={{ textAlign: "center", marginTop: 12, fontSize: 11, color: "#374151" }}>← swipe to explore →</div>
       </div>
 
       {/* HOW IT WORKS */}
-      <div style={{ padding: "0 24px 48px" }}>
+      <div style={{ padding: "40px 24px 48px" }}>
         <div style={{ background: "#111", borderRadius: 20, padding: "24px 20px", border: "1px solid #1e1e1e" }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: "#DC2626", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 20, textAlign: "center" }}>How it works</div>
           {[
@@ -2889,6 +3523,40 @@ export default function App() {
     }
   };
 
+  // ── Create bulk distribution run ──
+  const onCreateBulkRun = async (pickupAddress, items) => {
+    // items = [{ recipientName, recipientPhone, deliveryAddress, deliveryZone, description, size, declaredValue }]
+    const results = [];
+    for (const item of items) {
+      const { base, protectionFee, total, isHighValue } = calcFees(parseFloat(item.declaredValue) || 0, item.deliveryZone);
+      const trackingCode = generateTracking();
+      const { data, error } = await supabase.from("packages").insert({
+        tracking_code:    trackingCode,
+        customer_id:      user.id,
+        customer_name:    user.name,
+        recipient_name:   item.recipientName,
+        recipient_phone:  item.recipientPhone,
+        pickup_address:   pickupAddress,
+        delivery_address: item.deliveryAddress,
+        delivery_zone:    item.deliveryZone,
+        description:      item.description,
+        size:             item.size || "small",
+        declared_value:   parseFloat(item.declaredValue) || 0,
+        base, protection_fee: protectionFee, total,
+        is_high_value:    isHighValue,
+        status:           "searching_rider",
+        request_type:     "delivery",
+        otp_warehouse:    isHighValue ? generateOTP() : null,
+        otp_delivery:     isHighValue ? generateOTP() : null,
+      }).select().single();
+      if (data) {
+        await addLog(data.id, user.id, "customer", user.name, "ORDER_PLACED", pickupAddress, `Distribution run — KES ${total} to ${item.recipientName}`);
+        results.push(dbPkgToApp(data));
+      }
+    }
+    return results;
+  };
+
   // ── Rider actions ──
   const onAcceptCollection = async (pkgId, riderId) => {
     const pkg = packages.find(p => p.id === pkgId);
@@ -3012,7 +3680,8 @@ export default function App() {
   return (
     <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", background: "#F1F5F9", minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
       <TopBar />
-      {user.role === "customer" && <CustomerApp packages={packages.filter(p => p.customerId === user.id)} onCreatePackage={onCreatePackage} onUpdatePayment={onUpdatePayment} transitLogs={logs} />}
+      {user.role === "customer"     && <CustomerApp packages={packages.filter(p => p.customerId === user.id)} onCreatePackage={onCreatePackage} onUpdatePayment={onUpdatePayment} transitLogs={logs} />}
+      {user.role === "distributor"  && <DistributorApp packages={packages.filter(p => p.customerId === user.id)} onCreateBulkRun={onCreateBulkRun} onCreatePackage={onCreatePackage} onUpdatePayment={onUpdatePayment} transitLogs={logs} currentUser={user} />}
       {user.role === "rider"    && <RiderApp packages={packages} onAcceptCollection={onAcceptCollection} onConfirmCollection={onConfirmCollection} onMarkAtWarehouse={onMarkAtWarehouse} onCollectedFromWarehouse={onCollectedFromWarehouse} onAcceptDelivery={onAcceptDelivery} onVerifyOTP={onVerifyOTP} onMarkDelivered={onMarkDelivered} transitLogs={logs} currentRider={user} customers={customers} />}
       {user.role === "admin"    && <AdminDashboard packages={packages} riders={riders} customers={customers} transitLogs={logs} onDispatch={onDispatch} onAcceptAtWarehouse={onAcceptAtWarehouse} onConfirmDelivery={onConfirmDelivery} onAddRider={onAddRider} accounts={[...riders, user]} onRefresh={loadPackages} />}
       <InstallBanner />
