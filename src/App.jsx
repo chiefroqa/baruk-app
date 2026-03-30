@@ -474,7 +474,7 @@ const openReceipt = (pkg, mpesaCodeVal = "") => {
 function CustomerApp({ packages, onCreatePackage, onUpdatePayment, transitLogs }) {
   const [view, setView]             = useState("track");
   const [orderType, setOrderType]   = useState("delivery"); // "delivery" | "pickup_request"
-  const [form, setForm]             = useState({ pickupAddress: "", deliveryAddress: "", deliveryZone: ZONES[0], description: "", size: "small", declaredValue: "", collectFromName: "", collectFromPhone: "" });
+  const [form, setForm]             = useState({ pickupAddress: "", deliveryAddress: "", deliveryZone: ZONES[0], description: "", size: "small", declaredValue: "", collectFromName: "", collectFromPhone: "", recipientName: "", recipientPhone: "" });
   const [expandedPkg, setExpandedPkg] = useState(null);
 
   // Payment flow stages: "form" → "payment" → "done"
@@ -488,10 +488,10 @@ function CustomerApp({ packages, onCreatePackage, onUpdatePayment, transitLogs }
   const isPickup = orderType === "pickup_request";
   const canSubmit = isPickup
     ? (form.pickupAddress && form.deliveryAddress && form.description && form.collectFromName)
-    : (form.pickupAddress && form.deliveryAddress && form.description);
+    : (form.pickupAddress && form.deliveryAddress && form.description && form.recipientName && form.recipientPhone);
 
   const resetForm = () => {
-    setForm({ pickupAddress: "", deliveryAddress: "", deliveryZone: ZONES[0], description: "", size: "small", declaredValue: "", collectFromName: "", collectFromPhone: "" });
+    setForm({ pickupAddress: "", deliveryAddress: "", deliveryZone: ZONES[0], description: "", size: "small", declaredValue: "", collectFromName: "", collectFromPhone: "", recipientName: "", recipientPhone: "" });
   };
 
   // Step 1 — customer fills form and clicks Book
@@ -814,6 +814,13 @@ function CustomerApp({ packages, onCreatePackage, onUpdatePayment, transitLogs }
                   );
                 })()}
               </div>
+              {!isPickup && (
+                <div style={{ marginBottom: 14, padding: "12px 14px", background: "#F0F9FF", borderRadius: 10, border: "1px solid #BAE6FD" }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#0369A1", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.06em" }}>📬 Recipient Details</div>
+                  <Input label="Recipient Name"  value={form.recipientName}  onChange={v => setForm(f => ({...f, recipientName: v}))}  placeholder="Who will receive the package?" />
+                  <Input label="Recipient Phone" value={form.recipientPhone} onChange={v => setForm(f => ({...f, recipientPhone: v}))} placeholder="e.g. 0712 345 678" type="tel" />
+                </div>
+              )}
               <Input label={isPickup ? "What should we collect?" : "Item Description"} value={form.description} onChange={v => setForm(f => ({...f, description: v}))} placeholder={isPickup ? "e.g. Dress from tailor, online order, shoes..." : "e.g. Electronics, Documents..."} />
               <Select label="Package Size"        value={form.size}            onChange={v => setForm(f => ({...f, size: v}))}            options={[{value:"small",label:"Small (under 5kg)"},{value:"medium",label:"Medium (5-15kg)"},{value:"large",label:"Large (15kg+)"}]} />
               <Input label="Declared Value (KES)" value={form.declaredValue}   onChange={v => setForm(f => ({...f, declaredValue: v}))}   type="number" placeholder="0" />
@@ -994,6 +1001,49 @@ function CustomerApp({ packages, onCreatePackage, onUpdatePayment, transitLogs }
                                     <a href={"tel:" + pkg.riderDeliveryPhone} style={{ background: "#10B981", color: "#fff", padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 700, textDecoration: "none" }}>📞 Call</a>
                                   )}
                                 </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* OTP codes — only shown for high value packages */}
+                        {pkg.isHighValue && (
+                          <div style={{ marginBottom: 16 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>🔐 Verification Codes</div>
+
+                            {/* Warehouse OTP — show until it's been verified */}
+                            {pkg.otpWarehouse && !pkg.otpWarehouseVerified && ["searching_rider","awaiting_collection","picked_up","pending_warehouse"].includes(pkg.status) && (
+                              <div style={{ background: "#EEF2FF", border: "1.5px solid #C7D2FE", borderRadius: 12, padding: "12px 14px", marginBottom: 10 }}>
+                                <div style={{ fontSize: 11, fontWeight: 700, color: "#3730A3", marginBottom: 6 }}>HUB ACCEPTANCE CODE</div>
+                                <div style={{ fontSize: 11, color: "#4338CA", marginBottom: 10, lineHeight: 1.5 }}>Share this code with the Baruk warehouse manager when your rider arrives at the hub. Do not share with anyone else.</div>
+                                <div style={{ display: "flex", justifyContent: "center", gap: 10 }}>
+                                  {pkg.otpWarehouse.split("").map((digit, i) => (
+                                    <div key={i} style={{ width: 44, height: 52, borderRadius: 10, background: "#fff", border: "2px solid #C7D2FE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, fontWeight: 900, color: "#3730A3", fontFamily: "monospace" }}>{digit}</div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {pkg.otpWarehouseVerified && (
+                              <div style={{ background: "#F0FDF4", border: "1px solid #6EE7B7", borderRadius: 10, padding: "8px 12px", marginBottom: 10, fontSize: 12, color: "#065F46", fontWeight: 700 }}>
+                                ✅ Hub code verified — package accepted at warehouse
+                              </div>
+                            )}
+
+                            {/* Delivery OTP — show once out for delivery */}
+                            {pkg.otpDelivery && !pkg.otpDeliveryVerified && ["at_warehouse","out_for_delivery","pending_delivery"].includes(pkg.status) && (
+                              <div style={{ background: "#FEF2F2", border: "1.5px solid #FECACA", borderRadius: 12, padding: "12px 14px" }}>
+                                <div style={{ fontSize: 11, fontWeight: 700, color: "#991B1B", marginBottom: 6 }}>DELIVERY VERIFICATION CODE</div>
+                                <div style={{ fontSize: 11, color: "#DC2626", marginBottom: 10, lineHeight: 1.5 }}>Give this code to the rider when they arrive at your door to confirm receipt. Do not share in advance.</div>
+                                <div style={{ display: "flex", justifyContent: "center", gap: 10 }}>
+                                  {pkg.otpDelivery.split("").map((digit, i) => (
+                                    <div key={i} style={{ width: 44, height: 52, borderRadius: 10, background: "#fff", border: "2px solid #FECACA", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, fontWeight: 900, color: "#DC2626", fontFamily: "monospace" }}>{digit}</div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {pkg.otpDeliveryVerified && (
+                              <div style={{ background: "#F0FDF4", border: "1px solid #6EE7B7", borderRadius: 10, padding: "8px 12px", fontSize: 12, color: "#065F46", fontWeight: 700 }}>
+                                ✅ Delivery code verified — handoff confirmed
                               </div>
                             )}
                           </div>
@@ -2735,7 +2785,7 @@ function PublicTrackingPage({ trackingCode, onSignup }) {
           <div style={{ fontSize: 18, fontWeight: 900, color: "#fff", marginBottom: 6, letterSpacing: "-0.5px" }}>Send with Baruk</div>
           <div style={{ fontSize: 13, color: "#9CA3AF", marginBottom: 16, lineHeight: 1.6 }}>Same-day delivery across Nairobi from KES 200. Track every step, just like this.</div>
           <button onClick={onSignup} style={{ width: "100%", padding: "14px", background: "#DC2626", color: "#fff", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 4px 16px rgba(220,38,38,0.4)", marginBottom: 10 }}>
-            Create Free Account →
+            Get Your Boda Guys →
           </button>
           <a href="tel:0107129273" style={{ fontSize: 12, color: "#6B7280", textDecoration: "none" }}>or call us on <strong style={{ color: "#DC2626" }}>0107129273</strong></a>
         </div>
@@ -2756,6 +2806,7 @@ function HomePage({ onSignup, onLogin }) {
   }, []);
 
   const tickerItems = [
+    "🏍️ Your boda guys. Anytime.",
     "🛵 Pickup Requests from any shop or supplier",
     "📦 OTP-verified handoffs",
     "📍 Live tracking every step",
@@ -2820,14 +2871,13 @@ function HomePage({ onSignup, onLogin }) {
 
         {/* Headline */}
         <h1 className="hp-fadein-2" style={{ fontSize: "clamp(44px, 12vw, 72px)", fontWeight: 900, lineHeight: 1.0, margin: "0 0 24px", letterSpacing: "-2px" }}>
-          Nairobi's<br />
-          fastest<br />
-          <span style={{ color: "#DC2626", fontStyle: "italic" }}>delivery<br />network</span>
+          Your boda guys.<br />
+          <span style={{ color: "#DC2626", fontStyle: "italic" }}>Anytime.</span>
         </h1>
 
         {/* Subline */}
         <p className="hp-fadein-3" style={{ fontSize: 16, color: "#9CA3AF", lineHeight: 1.7, margin: "0 0 36px", maxWidth: 340, marginLeft: "auto", marginRight: "auto" }}>
-          Send parcels. Request pickups. Track every handoff in real time — from the moment a rider accepts to the second your package lands at the door.
+          Verified riders. Live tracking. Same-day delivery across all of Nairobi — from KES 200. No waiting, no guessing, no excuses.
         </p>
 
         {/* CTA buttons */}
@@ -3031,7 +3081,7 @@ function HomePage({ onSignup, onLogin }) {
       <div style={{ padding: "0 24px 40px", textAlign: "center" }}>
         <button onClick={onSignup} className="hp-btn-primary"
           style={{ width: "100%", maxWidth: 400, padding: "16px", border: "none", borderRadius: 14, background: "#DC2626", color: "#fff", fontSize: 16, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s", boxShadow: "0 4px 20px rgba(220,38,38,0.4)", display: "block", margin: "0 auto" }}>
-          Create Free Account →
+          Get Your Boda Guys →
         </button>
         <div style={{ marginTop: 16, fontSize: 12, color: "#4B5563" }}>
           🏍️ Riders: accounts are created by the hub admin — contact <a href="tel:0107129273" style={{ color: "#DC2626", textDecoration: "none", fontWeight: 700 }}>0107129273</a>
@@ -3063,7 +3113,7 @@ const AuthLogo = () => (
   <div style={{ marginBottom: 28, textAlign: "center" }}>
     <div style={{ width: 64, height: 64, borderRadius: 20, background: "#DC2626", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, margin: "0 auto 12px", boxShadow: "0 8px 24px rgba(220,38,38,0.3)" }}>🏍️</div>
     <div style={{ fontSize: 32, fontWeight: 900, color: "#DC2626", letterSpacing: "-1px" }}>Baruk</div>
-    <div style={{ fontSize: 14, color: "#9CA3AF", marginTop: 4 }}>Fast. Reliable. Trackable.</div>
+    <div style={{ fontSize: 14, color: "#9CA3AF", marginTop: 4 }}>Your boda guys. Anytime.</div>
   </div>
 );
 
@@ -3498,6 +3548,8 @@ export default function App() {
       tracking_code:          trackingCode,
       customer_id:            user.id,
       customer_name:          user.name,
+      recipient_name:         form.recipientName  || null,
+      recipient_phone:        form.recipientPhone || null,
       pickup_address:         form.pickupAddress,
       delivery_address:       form.deliveryAddress,
       delivery_zone:          form.deliveryZone,
