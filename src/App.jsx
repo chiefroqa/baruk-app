@@ -715,3 +715,386 @@ function AdminDashboard({ orders, onSendQuote, onUpdateStatus, onAddNote, onAddT
     </div>
   );
 }
+// ============================================================
+// AUTH LOGO
+// ============================================================
+const AuthLogo = () => (
+  <div style={{ marginBottom: 28, textAlign: "center" }}>
+    <div style={{ width: 64, height: 64, borderRadius: 20, background: "#DC2626", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, margin: "0 auto 12px", boxShadow: "0 8px 24px rgba(220,38,38,0.3)" }}>🌐</div>
+    <div style={{ fontSize: 32, fontWeight: 900, color: "#DC2626", letterSpacing: "-1px" }}>Baruk</div>
+    <div style={{ fontSize: 14, color: "#9CA3AF", marginTop: 4 }}>Source it. Ship it. Delivered.</div>
+  </div>
+);
+
+const AuthError   = ({ msg }) => msg ? <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#DC2626", fontWeight: 600, marginBottom: 16 }}>⚠️ {msg}</div> : null;
+const AuthSuccess = ({ msg }) => msg ? <div style={{ background: "#ECFDF5", border: "1px solid #6EE7B7", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#065F46", fontWeight: 600, marginBottom: 16 }}>✅ {msg}</div> : null;
+const AuthBtn     = ({ label, onClick, loading, disabled }) => (
+  <button onClick={onClick} disabled={loading || disabled}
+    style={{ width: "100%", padding: "13px", background: loading || disabled ? "#FCA5A5" : "#DC2626", color: "#fff", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 800, cursor: loading || disabled ? "not-allowed" : "pointer", fontFamily: "inherit", marginTop: 4, boxShadow: "0 2px 12px rgba(220,38,38,0.25)" }}>
+    {loading ? "Please wait..." : label}
+  </button>
+);
+
+const AuthInput = ({ label, value, onChange, type = "text", placeholder, icon }) => (
+  <div style={{ marginBottom: 16 }}>
+    <div style={{ fontSize: 12, fontWeight: 700, color: "#6B7280", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</div>
+    <div style={{ position: "relative" }}>
+      {icon && <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 15, pointerEvents: "none" }}>{icon}</span>}
+      <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+        style={{ width: "100%", padding: icon ? "12px 14px 12px 38px" : "12px 14px", border: "1.5px solid #E5E7EB", borderRadius: 10, fontSize: 14, fontFamily: "inherit", boxSizing: "border-box", outline: "none", color: "#111827" }}
+        onFocus={e => e.target.style.borderColor = "#DC2626"}
+        onBlur={e => e.target.style.borderColor = "#E5E7EB"} />
+    </div>
+  </div>
+);
+
+// ============================================================
+// SIGNUP SCREEN
+// ============================================================
+function SignupScreen({ onBack }) {
+  const [form, setForm]       = useState({ name: "", email: "", phone: "", password: "", confirm: "" });
+  const [error, setError]     = useState("");
+  const [success, setSuccess] = useState("");
+  const [loading, setLoading] = useState(false);
+  const set = k => v => setForm(f => ({ ...f, [k]: v }));
+
+  const handleSignup = async () => {
+    setError(""); setSuccess("");
+    if (!form.name || !form.email || !form.phone || !form.password || !form.confirm) return setError("Please fill in all fields.");
+    if (form.password.length < 6) return setError("Password must be at least 6 characters.");
+    if (form.password !== form.confirm) return setError("Passwords do not match.");
+    setLoading(true);
+    try {
+      const { error: err } = await supabase.auth.signUp({
+        email: form.email.trim().toLowerCase(), password: form.password,
+        options: { data: { name: form.name.trim(), phone: form.phone.trim(), role: "customer" } },
+      });
+      if (err) throw err;
+      setSuccess("Account created! Signing you in…");
+    } catch (err) {
+      setError(err.message || "Signup failed. Please try again.");
+    } finally { setLoading(false); }
+  };
+
+  return (
+    <div style={{ minHeight: "100dvh", background: "#F9FAFB", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', system-ui, sans-serif", padding: 20 }}>
+      <div style={{ width: "100%", maxWidth: 420 }}>
+        <AuthLogo />
+        <div style={{ background: "#fff", borderRadius: 20, padding: 28, boxShadow: "0 4px 32px rgba(0,0,0,0.08)" }}>
+          <div style={{ fontSize: 22, fontWeight: 900, color: "#111827", marginBottom: 4 }}>Create Account</div>
+          <div style={{ fontSize: 14, color: "#6B7280", marginBottom: 24 }}>Free to join. Request anything from China.</div>
+          <AuthInput label="Full Name"        value={form.name}     onChange={set("name")}     placeholder="e.g. Amara Osei"      icon="👤" />
+          <AuthInput label="Email Address"    value={form.email}    onChange={set("email")}    placeholder="you@example.com"      icon="✉️" type="email" />
+          <AuthInput label="Phone Number"     value={form.phone}    onChange={set("phone")}    placeholder="e.g. 0712 345 678"    icon="📞" type="tel" />
+          <AuthInput label="Password"         value={form.password} onChange={set("password")} placeholder="Min. 6 characters"    icon="🔒" type="password" />
+          <AuthInput label="Confirm Password" value={form.confirm}  onChange={set("confirm")}  placeholder="Repeat your password" icon="🔒" type="password" />
+          <AuthError msg={error} /><AuthSuccess msg={success} />
+          <AuthBtn label="Create Account" onClick={handleSignup} loading={loading} disabled={!form.name || !form.email || !form.phone || !form.password || !form.confirm} />
+          <div style={{ textAlign: "center", marginTop: 20, paddingTop: 20, borderTop: "1px solid #F3F4F6" }}>
+            <span style={{ fontSize: 14, color: "#6B7280" }}>Already have an account? </span>
+            <button onClick={onBack} style={{ fontSize: 14, color: "#DC2626", fontWeight: 700, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>Sign In</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// LOGIN SCREEN
+// ============================================================
+function LoginScreen({ onGoSignup, onBack }) {
+  const [email, setEmail]       = useState("");
+  const [password, setPassword] = useState("");
+  const [showPwd, setShowPwd]   = useState(false);
+  const [error, setError]       = useState("");
+  const [loading, setLoading]   = useState(false);
+
+  const handleLogin = async () => {
+    setError(""); setLoading(true);
+    try {
+      const { error: err } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
+      if (err) throw err;
+    } catch { setError("Incorrect email or password. Please try again."); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div style={{ minHeight: "100dvh", background: "#F9FAFB", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', system-ui, sans-serif", padding: 20 }}>
+      <div style={{ width: "100%", maxWidth: 420 }}>
+        <AuthLogo />
+        <div style={{ background: "#fff", borderRadius: 20, padding: 28, boxShadow: "0 4px 32px rgba(0,0,0,0.08)" }}>
+          <div style={{ fontSize: 22, fontWeight: 900, color: "#111827", marginBottom: 4 }}>Welcome back</div>
+          <div style={{ fontSize: 14, color: "#6B7280", marginBottom: 24 }}>Sign in to your Baruk account</div>
+          <AuthInput label="Email" value={email} onChange={setEmail} placeholder="you@example.com" icon="✉️" type="email" />
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#6B7280", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>Password</div>
+            <div style={{ position: "relative" }}>
+              <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 15, pointerEvents: "none" }}>🔒</span>
+              <input type={showPwd ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleLogin()} placeholder="••••••••"
+                style={{ width: "100%", padding: "12px 44px 12px 38px", border: "1.5px solid #E5E7EB", borderRadius: 10, fontSize: 14, fontFamily: "inherit", boxSizing: "border-box", outline: "none", color: "#111827" }}
+                onFocus={e => e.target.style.borderColor = "#DC2626"} onBlur={e => e.target.style.borderColor = "#E5E7EB"} />
+              <button onClick={() => setShowPwd(s => !s)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 16 }}>
+                {showPwd ? "🙈" : "👁️"}
+              </button>
+            </div>
+          </div>
+          <AuthError msg={error} />
+          <AuthBtn label="Sign In" onClick={handleLogin} loading={loading} disabled={!email || !password} />
+          <div style={{ textAlign: "center", marginTop: 20, paddingTop: 20, borderTop: "1px solid #F3F4F6" }}>
+            <span style={{ fontSize: 14, color: "#6B7280" }}>New here? </span>
+            <button onClick={onGoSignup} style={{ fontSize: 14, color: "#DC2626", fontWeight: 700, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>Create a free account →</button>
+          </div>
+          {onBack && (
+            <div style={{ textAlign: "center", marginTop: 10 }}>
+              <button onClick={onBack} style={{ fontSize: 13, color: "#9CA3AF", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>← Back to home</button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// LOADING SCREEN
+// ============================================================
+const LoadingScreen = () => (
+  <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: "#F9FAFB", flexDirection: "column", gap: 16, fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+    <div style={{ width: 64, height: 64, borderRadius: 20, background: "#DC2626", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, boxShadow: "0 8px 24px rgba(220,38,38,0.3)" }}>🌐</div>
+    <div style={{ fontSize: 24, fontWeight: 900, color: "#DC2626" }}>Baruk</div>
+    <div style={{ width: 32, height: 32, border: "3px solid #FECACA", borderTopColor: "#DC2626", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+  </div>
+);
+
+// ============================================================
+// PWA INSTALL BANNER
+// ============================================================
+function InstallBanner() {
+  const [show, setShow]   = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+
+  useEffect(() => {
+    const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+    if (isStandalone || sessionStorage.getItem("install-dismissed")) return;
+    const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    setIsIOS(ios);
+    if (ios) { setTimeout(() => setShow(true), 3000); }
+    else {
+      const handler = e => { e.preventDefault(); setDeferredPrompt(e); setTimeout(() => setShow(true), 3000); };
+      window.addEventListener("beforeinstallprompt", handler);
+      return () => window.removeEventListener("beforeinstallprompt", handler);
+    }
+  }, []);
+
+  const dismiss = () => { setShow(false); sessionStorage.setItem("install-dismissed", "1"); };
+
+  if (!show) return null;
+  return (
+    <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 9999, background: "#fff", borderTop: "2px solid #FECACA", boxShadow: "0 -4px 24px rgba(0,0,0,0.12)", padding: "16px 20px", fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+        <div style={{ width: 48, height: 48, borderRadius: 12, background: "#DC2626", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0 }}>🌐</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 15, fontWeight: 900, color: "#111827", marginBottom: 2 }}>Install Baruk App</div>
+          {isIOS
+            ? <div style={{ fontSize: 13, color: "#6B7280" }}>Tap <strong>Share ⎋</strong> then <strong>"Add to Home Screen"</strong></div>
+            : <div style={{ fontSize: 13, color: "#6B7280" }}>Get quick access — works offline, opens instantly</div>}
+          {!isIOS && deferredPrompt && (
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <button onClick={async () => { deferredPrompt.prompt(); await deferredPrompt.userChoice; dismiss(); }}
+                style={{ background: "#DC2626", color: "#fff", border: "none", borderRadius: 8, padding: "7px 16px", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>Install</button>
+              <button onClick={dismiss} style={{ background: "#F3F4F6", color: "#6B7280", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Not now</button>
+            </div>
+          )}
+        </div>
+        <button onClick={dismiss} style={{ background: "none", border: "none", fontSize: 20, color: "#9CA3AF", cursor: "pointer" }}>✕</button>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// MAIN APP
+// ============================================================
+export default function App() {
+  const [user, setUser]             = useState(null);
+  const [authView, setAuthView]     = useState("home");
+  const [appLoading, setAppLoading] = useState(true);
+  const [orders, setOrders]         = useState([]);
+  const [logs, setLogs]             = useState([]);
+  const [customers, setCustomers]   = useState([]);
+  const realtimeRef                 = useRef(null);
+
+  const profileToUser = (authUser, profile) => ({
+    id:    authUser.id,
+    email: authUser.email,
+    name:  profile.name,
+    phone: profile.phone,
+    role:  profile.role,
+  });
+
+  const loadProfile = useCallback(async (authUser) => {
+    const { data: profile } = await supabase.from("profiles").select("*").eq("id", authUser.id).single();
+    if (profile) setUser(profileToUser(authUser, profile));
+  }, []);
+
+  const loadOrders = useCallback(async () => {
+    const { data, error } = await supabase.from("orders").select("*").order("created_at", { ascending: false });
+    if (error) { console.error("[loadOrders]", error); return; }
+    if (data) setOrders(data.map(dbOrderToApp));
+  }, []);
+
+  const loadLogs = useCallback(async () => {
+    const { data } = await supabase.from("order_logs").select("*").order("created_at", { ascending: true });
+    if (data) setLogs(data.map(dbLogToApp));
+  }, []);
+
+  const loadCustomers = useCallback(async () => {
+    const { data } = await supabase.from("profiles").select("*").eq("role", "customer");
+    if (data) setCustomers(data.map(p => ({ id: p.id, name: p.name, phone: p.phone, email: p.email, role: "customer", createdAt: p.created_at })));
+  }, []);
+
+  const addLog = async (orderId, actorName, actorRole, event, notes = "") => {
+    await supabase.from("order_logs").insert({ order_id: orderId, actor_name: actorName, actor_role: actorRole, event, notes });
+    await loadLogs();
+  };
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) loadProfile(session.user);
+      setAppLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) { loadProfile(session.user); }
+      else { setUser(null); setOrders([]); setLogs([]); }
+    });
+    return () => subscription.unsubscribe();
+  }, [loadProfile]);
+
+  useEffect(() => {
+    if (!user) return;
+    loadOrders(); loadLogs(); if (user.role === "admin") loadCustomers();
+    if (realtimeRef.current) supabase.removeChannel(realtimeRef.current);
+    const channel = supabase.channel("sourcing-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" },     () => loadOrders())
+      .on("postgres_changes", { event: "*", schema: "public", table: "order_logs" }, () => loadLogs())
+      .subscribe();
+    realtimeRef.current = channel;
+    return () => supabase.removeChannel(channel);
+  }, [user, loadOrders, loadLogs, loadCustomers]);
+
+  const onCreateOrder = async (form) => {
+    const orderCode = generateOrderCode();
+    const { data, error } = await supabase.from("orders").insert({
+      order_code:       orderCode,
+      customer_id:      user.id,
+      customer_name:    user.name,
+      customer_phone:   user.phone,
+      customer_email:   user.email,
+      product_name:     form.productName,
+      description:      form.description,
+      quantity:         parseInt(form.quantity) || 1,
+      budget_min:       parseFloat(form.budgetMin) || null,
+      budget_max:       parseFloat(form.budgetMax) || null,
+      reference_links:  form.referenceLinks || null,
+      source_country:   "China",
+      delivery_address: form.deliveryAddress,
+      status:           "pending",
+      payment_status:   "unpaid",
+    }).select().single();
+    if (error) { console.error("[onCreateOrder]", error); return null; }
+    await addLog(data.id, user.name, "customer", "REQUEST_SUBMITTED", `${form.productName} — Qty ${form.quantity}`);
+    return dbOrderToApp(data);
+  };
+
+  const onSendQuote = async (orderId, quoteData) => {
+    const { error } = await supabase.from("orders").update({
+      product_cost:   quoteData.productCost,
+      shipping_cost:  quoteData.shippingCost,
+      customs_duty:   quoteData.customsDuty,
+      service_fee:    quoteData.serviceFee,
+      total_cost:     quoteData.totalCost,
+      balance_due:    quoteData.balanceDue,
+      estimated_days: quoteData.estimatedDays,
+      admin_notes:    quoteData.adminNotes,
+      status:         "quoted",
+    }).eq("id", orderId);
+    if (error) { console.error("[onSendQuote]", error); return; }
+    await addLog(orderId, user.name, "admin", "QUOTE_SENT", `Total KES ${quoteData.totalCost.toLocaleString()} — Est. ${quoteData.estimatedDays || "?"} days`);
+    await loadOrders();
+  };
+
+  const onApproveQuote = async (orderId) => {
+    await supabase.from("orders").update({ status: "approved" }).eq("id", orderId);
+    await addLog(orderId, user.name, "customer", "ORDER_APPROVED", "Customer approved quote and paid deposit");
+    await loadOrders();
+  };
+
+  const onUpdatePayment = async (orderId, mpesaCode) => {
+    const order = orders.find(o => o.id === orderId);
+    const depositAmount = order?.totalCost || 0;
+    await supabase.from("orders").update({
+      payment_status: "deposit_paid",
+      mpesa_code:     mpesaCode,
+      deposit_paid:   depositAmount,
+      balance_due:    0,
+    }).eq("id", orderId);
+    await addLog(orderId, user.name, "customer", "DEPOSIT_PAID", `M-Pesa code: ${mpesaCode} — KES ${depositAmount.toLocaleString()}`);
+    await loadOrders();
+  };
+
+  const onUpdateStatus = async (orderId, newStatus) => {
+    await supabase.from("orders").update({ status: newStatus }).eq("id", orderId);
+    await addLog(orderId, user.name, "admin", "STATUS_UPDATED", `Status changed to: ${newStatus.replace(/_/g, " ")}`);
+    await loadOrders();
+  };
+
+  const onAddNote = async (orderId, note) => {
+    await supabase.from("orders").update({ admin_notes: note }).eq("id", orderId);
+    await addLog(orderId, user.name, "admin", "NOTE_ADDED", note);
+    await loadOrders();
+  };
+
+  const onAddTracking = async (orderId, trackingNumber) => {
+    await supabase.from("orders").update({ tracking_number: trackingNumber }).eq("id", orderId);
+    await addLog(orderId, user.name, "admin", "TRACKING_ADDED", `Tracking number: ${trackingNumber}`);
+    await loadOrders();
+  };
+
+  const handleSignOut = async () => { await supabase.auth.signOut(); setUser(null); };
+
+  if (appLoading) return <LoadingScreen />;
+
+  if (!user) {
+    if (authView === "signup") return <><SignupScreen onBack={() => setAuthView("login")} /><InstallBanner /></>;
+    if (authView === "login")  return <><LoginScreen onGoSignup={() => setAuthView("signup")} onBack={() => setAuthView("home")} /><InstallBanner /></>;
+    return <><HomePage onSignup={() => setAuthView("signup")} onLogin={() => setAuthView("login")} /><InstallBanner /></>;
+  }
+
+  const myOrders = user.role === "admin" ? orders : orders.filter(o => o.customerId === user.id);
+
+  return (
+    <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", minHeight: "100dvh", background: "#F9FAFB" }}>
+      <div style={{ background: "#111827", padding: "10px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, zIndex: 100 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 30, height: 30, borderRadius: 8, background: "#DC2626", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>🌐</div>
+          <span style={{ fontSize: 16, fontWeight: 900, color: "#fff", letterSpacing: "-0.5px" }}>Baruk</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ fontSize: 13, color: "#9CA3AF" }}>{user.name}</div>
+          <span style={{ fontSize: 10, fontWeight: 700, color: "#DC2626", background: "rgba(220,38,38,0.15)", padding: "2px 8px", borderRadius: 20, textTransform: "uppercase" }}>{user.role}</span>
+          <button onClick={handleSignOut} style={{ fontSize: 12, color: "#6B7280", background: "none", border: "1px solid #374151", borderRadius: 8, padding: "4px 12px", cursor: "pointer", fontFamily: "inherit" }}>Sign Out</button>
+        </div>
+      </div>
+
+      {user.role === "admin"
+        ? <AdminDashboard orders={orders} onSendQuote={onSendQuote} onUpdateStatus={onUpdateStatus} onAddNote={onAddNote} onAddTracking={onAddTracking} customers={customers} logs={logs} currentUser={user} />
+        : <CustomerApp orders={myOrders} onCreateOrder={onCreateOrder} onApproveQuote={onApproveQuote} onUpdatePayment={onUpdatePayment} logs={logs} currentUser={user} />
+      }
+      <InstallBanner />
+    </div>
+  );
+}
