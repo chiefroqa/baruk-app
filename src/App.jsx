@@ -416,80 +416,326 @@ const OrderCard = ({ order, onClick }) => (
 // HOME PAGE
 // ============================================================
 function HomePage({ onSignup, onLogin }) {
+  const A = "https://wa.me/254107129273";
+  
   return (
-    <div style={{ minHeight: "100dvh", background: "#0F0F0F", color: "#fff", fontFamily: "'DM Sans', system-ui, sans-serif", overflowX: "hidden" }}>
-      {/* Nav */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 24px", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: "#DC2626", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🌐</div>
-          <span style={{ fontSize: 20, fontWeight: 900, letterSpacing: "-0.5px" }}>Baruk</span>
+    <div style={{
+      fontFamily: "'DM Sans', system-ui, sans-serif",
+      background: "#0A0F1E", color: "#fff",
+      overflowX: "hidden", minHeight: "100dvh"
+    }}>
+      <style>{`
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        @keyframes shipMove { from{left:0%} to{left:calc(100% - 24px)} }
+        @keyframes trackFill { from{transform:scaleX(0.2);transform-origin:left} to{transform:scaleX(1);transform-origin:left} }
+        @keyframes spin { to{transform:rotate(360deg)} }
+        @keyframes fadeUp { from{opacity:0;transform:translateY(28px)} to{opacity:1;transform:translateY(0)} }
+        .baruk-btn-primary {
+          background:#DC2626; color:#fff; border:none; border-radius:10px;
+          padding:15px 32px; font-size:15px; font-weight:700; cursor:pointer;
+          font-family:inherit; display:inline-block; text-decoration:none;
+          box-shadow:0 8px 32px rgba(220,38,38,0.35); transition:all 0.2s;
+        }
+        .baruk-btn-primary:hover { background:#EF4444; transform:translateY(-2px); box-shadow:0 12px 40px rgba(220,38,38,0.45); }
+        .baruk-btn-secondary {
+          background:rgba(255,255,255,0.06); color:#fff;
+          border:1px solid rgba(255,255,255,0.15); border-radius:10px;
+          padding:15px 28px; font-size:15px; font-weight:600; cursor:pointer;
+          font-family:inherit; display:inline-block; text-decoration:none; transition:all 0.2s;
+        }
+        .baruk-btn-secondary:hover { background:rgba(255,255,255,0.12); border-color:rgba(255,255,255,0.3); }
+        .baruk-service-card {
+          background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);
+          border-radius:20px; padding:32px 28px; transition:all 0.25s; position:relative; overflow:hidden;
+        }
+        .baruk-service-card:hover { border-color:rgba(220,38,38,0.4); transform:translateY(-4px); box-shadow:0 20px 48px rgba(0,0,0,0.3); }
+        .baruk-why-item {
+          background:#fff; border-radius:16px; padding:28px 24px;
+          border:1px solid #E5E7EB; transition:all 0.2s;
+        }
+        .baruk-why-item:hover { box-shadow:0 8px 32px rgba(0,0,0,0.08); transform:translateY(-2px); }
+        .baruk-category-pill {
+          display:flex; align-items:center; gap:8px;
+          background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.08);
+          border-radius:100px; padding:10px 20px; font-size:14px; font-weight:500;
+          color:#fff; transition:all 0.2s; cursor:default;
+        }
+        .baruk-category-pill:hover { background:rgba(220,38,38,0.12); border-color:rgba(220,38,38,0.35); color:#EF4444; }
+        .baruk-testimonial {
+          background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);
+          border-radius:20px; padding:28px 24px;
+        }
+        @media(max-width:768px){
+          .baruk-stats-strip { grid-template-columns:repeat(2,1fr) !important; }
+          .baruk-services-grid { grid-template-columns:1fr !important; }
+          .baruk-why-grid { grid-template-columns:1fr !important; }
+          .baruk-process-grid { grid-template-columns:1fr 1fr !important; }
+          .baruk-footer-grid { grid-template-columns:1fr 1fr !important; }
+          .baruk-hero-h1 { font-size:42px !important; letter-spacing:-1px !important; }
+          .baruk-contact-strip { flex-direction:column !important; align-items:flex-start !important; }
+          .baruk-nav-links { display:none !important; }
+          .baruk-actions { flex-direction:column !important; }
+          .baruk-actions button, .baruk-actions a { width:100%; text-align:center; }
+        }
+      `}</style>
+
+      {/* ── NAV ── */}
+      <div style={{
+        position:"sticky", top:0, zIndex:100,
+        display:"flex", alignItems:"center", justifyContent:"space-between",
+        padding:"0 5%", height:68,
+        background:"rgba(10,15,30,0.92)", backdropFilter:"blur(16px)",
+        borderBottom:"1px solid rgba(255,255,255,0.07)"
+      }}>
+        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+          <div style={{ width:38, height:38, borderRadius:10, background:"#DC2626", display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, fontWeight:900, color:"#fff" }}>B</div>
+          <span style={{ fontSize:20, fontWeight:900, color:"#fff", letterSpacing:"-0.5px" }}>Baruk</span>
+          <span style={{ fontSize:11, color:"#DC2626", background:"rgba(220,38,38,0.12)", border:"1px solid rgba(220,38,38,0.25)", borderRadius:20, padding:"2px 10px", fontWeight:700, letterSpacing:"0.06em", textTransform:"uppercase" }}>Logistics</span>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={onLogin} style={{ padding: "8px 18px", background: "transparent", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 10, color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Sign In</button>
-          <button onClick={onSignup} style={{ padding: "8px 18px", background: "#DC2626", border: "none", borderRadius: 10, color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Get Started</button>
+        <div className="baruk-nav-links" style={{ display:"flex", gap:28, listStyle:"none" }}>
+          {[["#services","Services"],["#how","How it works"],["#categories","We source"],["#why","Why us"]].map(([h,l]) => (
+            <a key={h} href={h} style={{ color:"#8A96A8", textDecoration:"none", fontSize:14, fontWeight:500, transition:"color 0.2s" }}
+              onMouseEnter={e=>e.target.style.color="#fff"} onMouseLeave={e=>e.target.style.color="#8A96A8"}>{l}</a>
+          ))}
+        </div>
+        <div style={{ display:"flex", gap:8 }}>
+          <button onClick={onLogin} style={{ padding:"8px 18px", background:"transparent", border:"1px solid rgba(255,255,255,0.18)", borderRadius:9, color:"#fff", fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>Sign In</button>
+          <button onClick={onSignup} className="baruk-btn-primary" style={{ padding:"9px 20px", fontSize:14 }}>Get Started</button>
         </div>
       </div>
 
-      {/* Hero */}
-      <div style={{ textAlign: "center", padding: "72px 24px 56px" }}>
-        <div style={{ display: "inline-block", background: "rgba(220,38,38,0.15)", border: "1px solid rgba(220,38,38,0.3)", borderRadius: 20, padding: "6px 18px", fontSize: 12, fontWeight: 700, color: "#F87171", marginBottom: 24, textTransform: "uppercase", letterSpacing: "0.1em" }}>
-          Sourcing from China · Delivered to Kenya
-        </div>
-        <h1 style={{ fontSize: "clamp(38px, 7vw, 72px)", fontWeight: 900, lineHeight: 1.08, letterSpacing: "-2px", margin: "0 auto 20px", maxWidth: 800 }}>
-          We source it.<br />
-          <span style={{ color: "#DC2626" }}>You get it.</span>
-        </h1>
-        <p style={{ fontSize: "clamp(15px, 2.5vw, 20px)", color: "rgba(255,255,255,0.55)", maxWidth: 560, margin: "0 auto 36px", lineHeight: 1.6 }}>
-          Request anything from China. We find the supplier, handle shipping, clear customs, and deliver to your door in Nairobi.
-        </p>
-        <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-          <button onClick={onSignup} style={{ padding: "14px 32px", background: "#DC2626", border: "none", borderRadius: 12, color: "#fff", fontSize: 16, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 8px 24px rgba(220,38,38,0.4)" }}>
-            Place a Request →
-          </button>
-          <button onClick={onLogin} style={{ padding: "14px 28px", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 12, color: "#fff", fontSize: 16, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-            Track My Order
-          </button>
+      {/* ── HERO ── */}
+      <div style={{ minHeight:"calc(100vh - 68px)", display:"flex", flexDirection:"column", justifyContent:"center", padding:"80px 5% 60px", position:"relative", overflow:"hidden" }}>
+        {/* bg glow */}
+        <div style={{ position:"absolute", inset:0, zIndex:0,
+          background:"radial-gradient(ellipse 55% 55% at 70% 50%, rgba(220,38,38,0.13) 0%, transparent 70%), radial-gradient(ellipse 35% 35% at 20% 80%, rgba(220,38,38,0.07) 0%, transparent 60%)" }} />
+        {/* grid */}
+        <div style={{ position:"absolute", inset:0, zIndex:0,
+          backgroundImage:"linear-gradient(rgba(255,255,255,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.025) 1px,transparent 1px)",
+          backgroundSize:"60px 60px",
+          WebkitMaskImage:"radial-gradient(ellipse 80% 80% at 50% 50%,black 0%,transparent 100%)" }} />
+
+        <div style={{ position:"relative", zIndex:1, maxWidth:900, animation:"fadeUp 0.7s ease both" }}>
+          {/* eyebrow */}
+          <div style={{ display:"inline-flex", alignItems:"center", gap:8, background:"rgba(220,38,38,0.12)", border:"1px solid rgba(220,38,38,0.3)", borderRadius:100, padding:"6px 16px", marginBottom:28, fontSize:12, fontWeight:600, color:"#EF4444", letterSpacing:"0.08em", textTransform:"uppercase" }}>
+            <span style={{ width:6, height:6, borderRadius:"50%", background:"#EF4444", animation:"pulse 2s infinite", display:"inline-block" }} />
+            Nairobi-based · China & Global Sourcing
+          </div>
+
+          <h1 className="baruk-hero-h1" style={{ fontSize:"clamp(44px,7vw,92px)", fontWeight:900, lineHeight:1.0, letterSpacing:"-2px", marginBottom:24 }}>
+            Move cargo<br/>
+            <span style={{ color:"#DC2626" }}>anywhere.</span><br/>
+            <span style={{ WebkitTextStroke:"1.5px rgba(255,255,255,0.2)", color:"transparent" }}>Effortlessly.</span>
+          </h1>
+
+          <p style={{ fontSize:"clamp(15px,2vw,19px)", color:"#8A96A8", lineHeight:1.65, maxWidth:540, marginBottom:40 }}>
+            We handle imports and exports from China and beyond — sourcing, shipping, customs clearance, and last-mile delivery to your door in Nairobi.
+          </p>
+
+          <div className="baruk-actions" style={{ display:"flex", gap:12, flexWrap:"wrap", marginBottom:56 }}>
+            <button onClick={onSignup} className="baruk-btn-primary">📦 Start a Shipment</button>
+            <button onClick={onLogin} className="baruk-btn-secondary">Track my order →</button>
+          </div>
+
+          {/* Route animation */}
+          <div style={{ display:"flex", alignItems:"center", gap:0, background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:16, padding:"18px 28px", maxWidth:540, position:"relative" }}>
+            <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4, minWidth:76 }}>
+              <span style={{ fontSize:26 }}>🇨🇳</span>
+              <span style={{ fontSize:10, fontWeight:700, color:"#8A96A8", letterSpacing:"0.06em", textTransform:"uppercase" }}>Shanghai</span>
+            </div>
+            <div style={{ flex:1, height:2, background:"rgba(255,255,255,0.08)", position:"relative", margin:"0 12px", borderRadius:1, overflow:"visible" }}>
+              <div style={{ position:"absolute", inset:0, background:"linear-gradient(90deg,#DC2626,#EF4444)", borderRadius:1, animation:"trackFill 3s ease-in-out infinite alternate" }} />
+              <span style={{ position:"absolute", top:"50%", transform:"translateY(-50%)", fontSize:18, animation:"shipMove 3s ease-in-out infinite alternate", filter:"drop-shadow(0 0 6px rgba(220,38,38,0.7))" }}>✈️</span>
+              <span style={{ position:"absolute", bottom:-20, left:"50%", transform:"translateX(-50%)", fontSize:10, color:"#8A96A8", whiteSpace:"nowrap", fontWeight:500 }}>7–21 days · door to door</span>
+            </div>
+            <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4, minWidth:76 }}>
+              <span style={{ fontSize:26 }}>🇰🇪</span>
+              <span style={{ fontSize:10, fontWeight:700, color:"#8A96A8", letterSpacing:"0.06em", textTransform:"uppercase" }}>Nairobi</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* How it works */}
-      <div style={{ padding: "48px 24px", maxWidth: 800, margin: "0 auto" }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#DC2626", textTransform: "uppercase", letterSpacing: "0.12em", textAlign: "center", marginBottom: 12 }}>How it works</div>
-        <h2 style={{ fontSize: 28, fontWeight: 900, textAlign: "center", marginBottom: 40, letterSpacing: "-0.5px" }}>Four steps to your doorstep</h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16 }}>
+      {/* ── STATS ── */}
+      <div className="baruk-stats-strip" style={{ background:"#DC2626", padding:"36px 5%", display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:0 }}>
+        {[["500+","Shipments completed"],["15+","Product categories"],["98%","On-time delivery"],["48hr","Quote turnaround"]].map(([n,l],i) => (
+          <div key={l} style={{ textAlign:"center", padding:"0 20px", borderRight: i < 3 ? "1px solid rgba(255,255,255,0.2)" : "none" }}>
+            <div style={{ fontSize:"clamp(26px,3.5vw,44px)", fontWeight:900, color:"#fff", lineHeight:1, marginBottom:4 }}>{n}</div>
+            <div style={{ fontSize:13, color:"rgba(255,255,255,0.75)", fontWeight:500 }}>{l}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── SERVICES ── */}
+      <div id="services" style={{ padding:"88px 5%", background:"#0E1525" }}>
+        <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase", color:"#DC2626", marginBottom:14 }}>What we do</div>
+        <h2 style={{ fontSize:"clamp(28px,4vw,52px)", fontWeight:900, letterSpacing:"-1px", lineHeight:1.1, marginBottom:16 }}>Full-spectrum cargo<br/>logistics</h2>
+        <p style={{ fontSize:17, color:"#8A96A8", lineHeight:1.6, maxWidth:500, marginBottom:52 }}>From the factory floor in Guangzhou to your doorstep in Nairobi — we own every step.</p>
+        <div className="baruk-services-grid" style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))", gap:18 }}>
           {[
-            { n: "01", icon: "📝", title: "Request", desc: "Tell us what you need. Add a reference link or photo." },
-            { n: "02", icon: "💬", title: "Get a Quote", desc: "We source it and send you a full landed cost breakdown." },
-            { n: "03", icon: "💳", title: "Pay via M-Pesa", desc: "Confirm your order with a simple M-Pesa payment." },
-            { n: "04", icon: "🚪", title: "Delivered", desc: "Your item ships, clears customs, arrives at your door." },
-          ].map(s => (
-            <div key={s.n} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 24 }}>
-              <div style={{ fontSize: 10, fontWeight: 800, color: "#DC2626", letterSpacing: "0.12em", marginBottom: 12 }}>{s.n}</div>
-              <div style={{ fontSize: 28, marginBottom: 10 }}>{s.icon}</div>
-              <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 6 }}>{s.title}</div>
-              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", lineHeight: 1.5 }}>{s.desc}</div>
+            ["🌏","Product Sourcing","Tell us what you need. We find verified suppliers, negotiate pricing, and quality-check before shipment. No Alibaba guesswork.","China · India · UAE"],
+            ["🚢","Sea Freight","FCL and LCL options for large cargo. We consolidate small orders into shared containers — you only pay for what you use.","FCL · LCL · Groupage"],
+            ["✈️","Air Freight","Time-sensitive cargo delivered in 5–10 days. Direct flights, fast customs, competitive rates for urgent shipments.","Express · Standard"],
+            ["🏛️","Customs Clearance","We handle IDF, KEBS, KRA, and all documentation. No surprises at the port — your cargo moves smoothly every time.","KRA · KEBS · IDF"],
+            ["🏍️","Last-Mile Delivery","From Mombasa port or JKIA straight to your door anywhere in Nairobi. Real-time tracking included.","Nairobi-wide"],
+            ["📤","Export Services","Exporting Kenyan goods? We handle packaging, documentation, and freight outbound to any destination.","Africa · Asia · Europe"],
+          ].map(([icon,title,desc,tag]) => (
+            <div key={title} className="baruk-service-card">
+              <span style={{ fontSize:34, marginBottom:18, display:"block" }}>{icon}</span>
+              <div style={{ fontSize:19, fontWeight:800, marginBottom:10, letterSpacing:"-0.3px" }}>{title}</div>
+              <div style={{ fontSize:14, color:"#8A96A8", lineHeight:1.65 }}>{desc}</div>
+              <span style={{ display:"inline-block", marginTop:16, background:"rgba(220,38,38,0.12)", border:"1px solid rgba(220,38,38,0.2)", borderRadius:20, padding:"4px 12px", fontSize:11, fontWeight:700, color:"#EF4444", letterSpacing:"0.04em", textTransform:"uppercase" }}>{tag}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Categories */}
-      <div style={{ padding: "24px 24px 48px", maxWidth: 800, margin: "0 auto" }}>
-        <h2 style={{ fontSize: 22, fontWeight: 900, textAlign: "center", marginBottom: 24, letterSpacing: "-0.3px" }}>What can you source?</h2>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center" }}>
-          {["📱 Electronics","🏍 Motorcycle Parts","🏠 Home Appliances","👗 Clothing & Fashion","🔧 Tools & Hardware","🎮 Gaming","🧴 Beauty & Care","🏋️ Fitness Gear","🏗 Industrial Supplies","📦 Custom Items"].map(c => (
-            <div key={c} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 20, padding: "8px 18px", fontSize: 13, fontWeight: 600 }}>{c}</div>
+      {/* ── HOW IT WORKS ── */}
+      <div id="how" style={{ padding:"88px 5%", background:"#F2F4F8" }}>
+        <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase", color:"#DC2626", marginBottom:14 }}>The process</div>
+        <h2 style={{ fontSize:"clamp(28px,4vw,52px)", fontWeight:900, letterSpacing:"-1px", lineHeight:1.1, marginBottom:16, color:"#0A0F1E" }}>Four steps from<br/>request to doorstep</h2>
+        <p style={{ fontSize:17, color:"#4B5563", lineHeight:1.6, maxWidth:500, marginBottom:52 }}>We've stripped the complexity out of international cargo.</p>
+        <div className="baruk-process-grid" style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:0, position:"relative" }}>
+          <div style={{ position:"absolute", top:36, left:"10%", right:"10%", height:1, background:"linear-gradient(90deg,transparent,#DC2626,transparent)", opacity:0.25 }} />
+          {[
+            ["01","Tell us what you need","Share the product, quantity and budget. A reference link or photo helps but isn't required."],
+            ["02","Receive a full quote","Within 48 hours you get a complete landed cost — product, freight, duty, and our fee. No hidden charges."],
+            ["03","Approve & pay via M-Pesa","Confirm the order and pay through M-Pesa. We begin sourcing and shipping immediately."],
+            ["04","Track & receive","Real-time status updates from dispatch to your door. We handle customs — you just wait for the knock."],
+          ].map(([n,title,desc]) => (
+            <div key={n} style={{ textAlign:"center", padding:"0 20px", position:"relative" }}>
+              <div style={{ width:72, height:72, borderRadius:"50%", border:"2px solid #DC2626", background:"rgba(220,38,38,0.08)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, fontWeight:900, color:"#DC2626", margin:"0 auto 20px", position:"relative", zIndex:1 }}>{n}</div>
+              <div style={{ fontSize:15, fontWeight:700, marginBottom:8, color:"#0A0F1E" }}>{title}</div>
+              <div style={{ fontSize:13, color:"#6B7280", lineHeight:1.6 }}>{desc}</div>
+            </div>
           ))}
         </div>
       </div>
 
-      {/* CTA */}
-      <div style={{ textAlign: "center", padding: "48px 24px 72px", borderTop: "1px solid rgba(255,255,255,0.07)" }}>
-        <h2 style={{ fontSize: 32, fontWeight: 900, marginBottom: 12, letterSpacing: "-0.5px" }}>Ready to order?</h2>
-        <p style={{ color: "rgba(255,255,255,0.45)", marginBottom: 28, fontSize: 15 }}>Create a free account and place your first request in under 2 minutes.</p>
-        <button onClick={onSignup} style={{ padding: "14px 36px", background: "#DC2626", border: "none", borderRadius: 12, color: "#fff", fontSize: 16, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 8px 24px rgba(220,38,38,0.4)" }}>
-          Get Started — It's Free
-        </button>
+      {/* ── CATEGORIES ── */}
+      <div id="categories" style={{ padding:"88px 5%", background:"#0E1525" }}>
+        <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase", color:"#DC2626", marginBottom:14 }}>What we source</div>
+        <h2 style={{ fontSize:"clamp(28px,4vw,52px)", fontWeight:900, letterSpacing:"-1px", lineHeight:1.1, marginBottom:16 }}>If it exists,<br/>we can get it.</h2>
+        <p style={{ fontSize:17, color:"#8A96A8", lineHeight:1.6, maxWidth:500, marginBottom:48 }}>We source across all categories. Minimum KES 10,000 for individual items.</p>
+        <div style={{ display:"flex", flexWrap:"wrap", gap:12 }}>
+          {[["🏍️","Motorcycle Parts & Accessories"],["📱","Electronics & Gadgets"],["🚰","Construction Finishings & Fittings"],["🏠","Home Appliances"],["👗","Clothing & Fashion"],["🔧","Tools & Industrial Equipment"],["🎮","Gaming & Entertainment"],["🧴","Beauty & Personal Care"],["🏋️","Fitness & Sports Gear"],["🌱","Agricultural Inputs"],["🚗","Auto Parts & Accessories"],["📦","Custom & Bulk Orders"]].map(([icon,label]) => (
+            <div key={label} className="baruk-category-pill"><span style={{ fontSize:18 }}>{icon}</span><span>{label}</span></div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── WHY BARUK ── */}
+      <div id="why" style={{ padding:"88px 5%", background:"#F2F4F8" }}>
+        <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase", color:"#DC2626", marginBottom:14 }}>Why Baruk</div>
+        <h2 style={{ fontSize:"clamp(28px,4vw,52px)", fontWeight:900, letterSpacing:"-1px", lineHeight:1.1, marginBottom:16, color:"#0A0F1E" }}>The sourcing agent<br/>Kenya has been missing</h2>
+        <p style={{ fontSize:17, color:"#4B5563", lineHeight:1.6, maxWidth:520, marginBottom:48 }}>We're not a middleman with a WhatsApp number. We're an end-to-end logistics operation built on years of doing this for ourselves first.</p>
+        <div className="baruk-why-grid" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
+          {[
+            ["🔒","Your money is safe","We only pay suppliers after verification. You get a reference code and real-time tracking from day one. No black holes."],
+            ["📊","Full landed cost upfront","Product + freight + customs + our fee — all in one number before you commit. What you approve is what you pay."],
+            ["🛃","Customs is our problem","IDF, KEBS, KRA clearance — we've done this hundreds of times. Your cargo doesn't sit at the port while you figure out paperwork."],
+            ["🤝","Real supplier relationships","We import regularly for our own retail operations. That means established supplier trust, better prices, and quality checks before anything ships."],
+            ["📱","M-Pesa native","Pay in KES via M-Pesa. No USD wire transfers, no forex headaches. We handle currency conversion at competitive rates."],
+            ["🚀","48-hour quote turnaround","Send us a request today, have a full landed cost quote by tomorrow. Most agents take a week just to respond."],
+          ].map(([icon,title,desc]) => (
+            <div key={title} className="baruk-why-item">
+              <div style={{ fontSize:26, marginBottom:12 }}>{icon}</div>
+              <div style={{ fontSize:16, fontWeight:700, color:"#0A0F1E", marginBottom:6 }}>{title}</div>
+              <div style={{ fontSize:14, color:"#6B7280", lineHeight:1.6 }}>{desc}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── TESTIMONIALS ── */}
+      <div style={{ padding:"88px 5%", background:"#0A0F1E" }}>
+        <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase", color:"#DC2626", marginBottom:14 }}>What clients say</div>
+        <h2 style={{ fontSize:"clamp(28px,4vw,52px)", fontWeight:900, letterSpacing:"-1px", lineHeight:1.1, marginBottom:52 }}>Real shipments.<br/>Real results.</h2>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))", gap:20 }}>
+          {[
+            ["A","Aisha M.","Cleaning Company Owner, Westlands","Baruk sourced sanitary equipment from China, cleared customs, and delivered to my warehouse. Saved me almost 40% vs local suppliers."],
+            ["J","James K.","Boda Operator, Langata","Got my motorcycle engine and brake system at almost half the local price. Updated every step of the way. This is how it should work."],
+            ["D","David O.","Property Developer, Karen","Sourced taps, showerheads and fittings for an entire apartment block. Quality was exactly as described and customs was completely handled."],
+          ].map(([initial,name,role,text]) => (
+            <div key={name} className="baruk-testimonial">
+              <div style={{ color:"#F59E0B", fontSize:14, marginBottom:14, letterSpacing:2 }}>★★★★★</div>
+              <p style={{ fontSize:15, lineHeight:1.65, color:"rgba(255,255,255,0.85)", marginBottom:20, fontStyle:"italic" }}>"{text}"</p>
+              <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                <div style={{ width:40, height:40, borderRadius:"50%", background:"#DC2626", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, fontWeight:900, color:"#fff", flexShrink:0 }}>{initial}</div>
+                <div>
+                  <div style={{ fontSize:14, fontWeight:700 }}>{name}</div>
+                  <div style={{ fontSize:12, color:"#8A96A8" }}>{role}</div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── CONTACT STRIP ── */}
+      <div className="baruk-contact-strip" style={{ background:"#0E1525", borderTop:"1px solid rgba(255,255,255,0.07)", borderBottom:"1px solid rgba(255,255,255,0.07)", padding:"28px 5%", display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:20 }}>
+        {[
+          ["📱","WhatsApp","+254 107 129 273"],
+          ["✉️","Email","cargo@baruk.co.ke"],
+          ["📍","Based in","Nairobi, Kenya"],
+          ["⏰","Response time","Within 2 hours"],
+        ].map(([icon,label,val]) => (
+          <div key={label} style={{ display:"flex", alignItems:"center", gap:12 }}>
+            <span style={{ fontSize:22 }}>{icon}</span>
+            <div>
+              <div style={{ fontSize:11, color:"#8A96A8", fontWeight:600, textTransform:"uppercase", letterSpacing:"0.06em" }}>{label}</div>
+              <div style={{ fontSize:15, fontWeight:700, color:"#fff" }}>{val}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── CTA ── */}
+      <div style={{ background:"#DC2626", padding:"88px 5%", textAlign:"center" }}>
+        <h2 style={{ fontSize:"clamp(32px,5vw,64px)", fontWeight:900, color:"#fff", letterSpacing:"-1.5px", marginBottom:16, lineHeight:1.05 }}>Ready to move<br/>your cargo?</h2>
+        <p style={{ fontSize:18, color:"rgba(255,255,255,0.8)", marginBottom:40 }}>Tell us what you need. Get a full landed cost quote in 48 hours.</p>
+        <div style={{ display:"flex", gap:12, justifyContent:"center", flexWrap:"wrap" }}>
+          <button onClick={onSignup} style={{ background:"#fff", color:"#DC2626", border:"none", borderRadius:10, padding:"15px 36px", fontSize:16, fontWeight:800, cursor:"pointer", fontFamily:"inherit", boxShadow:"0 8px 32px rgba(0,0,0,0.15)", transition:"all 0.2s" }}>
+            📦 Start a Shipment
+          </button>
+          <a href="https://wa.me/254107129273" target="_blank" rel="noreferrer"
+            style={{ display:"inline-flex", alignItems:"center", gap:8, background:"rgba(255,255,255,0.15)", border:"1px solid rgba(255,255,255,0.3)", color:"#fff", borderRadius:10, padding:"15px 28px", fontSize:15, fontWeight:700, cursor:"pointer", fontFamily:"inherit", textDecoration:"none", transition:"all 0.2s" }}>
+            💬 Chat on WhatsApp
+          </a>
+        </div>
+      </div>
+
+      {/* ── FOOTER ── */}
+      <div style={{ background:"#060911", padding:"56px 5% 28px", borderTop:"1px solid rgba(255,255,255,0.06)" }}>
+        <div className="baruk-footer-grid" style={{ display:"grid", gridTemplateColumns:"2fr 1fr 1fr 1fr", gap:40, marginBottom:40 }}>
+          <div>
+            <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
+              <div style={{ width:36, height:36, borderRadius:10, background:"#DC2626", display:"flex", alignItems:"center", justifyContent:"center", fontSize:17, fontWeight:900, color:"#fff" }}>B</div>
+              <span style={{ fontSize:19, fontWeight:900, color:"#fff" }}>Baruk</span>
+            </div>
+            <p style={{ fontSize:14, color:"#8A96A8", lineHeight:1.7, maxWidth:260 }}>End-to-end import and export logistics for Kenyan businesses and individuals. Source it. Ship it. Delivered.</p>
+          </div>
+          {[
+            ["Services",["Product Sourcing","Sea Freight","Air Freight","Customs Clearance","Export Services"]],
+            ["We Source",["Motorcycle Parts","Construction","Electronics","Auto Parts","All categories"]],
+            ["Company",["About us","How it works","Track shipment","Contact"]],
+          ].map(([title,links]) => (
+            <div key={title}>
+              <div style={{ fontSize:12, fontWeight:700, color:"#fff", textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:16 }}>{title}</div>
+              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                {links.map(l => <a key={l} href="#" style={{ color:"#8A96A8", textDecoration:"none", fontSize:14, transition:"color 0.2s" }} onMouseEnter={e=>e.target.style.color="#fff"} onMouseLeave={e=>e.target.style.color="#8A96A8"}>{l}</a>)}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ borderTop:"1px solid rgba(255,255,255,0.07)", paddingTop:24, display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:12 }}>
+          <div style={{ fontSize:13, color:"#8A96A8" }}>© 2025 Baruk Logistics. All rights reserved.</div>
+          <div style={{ display:"flex", gap:8 }}>
+            {["KRA Compliant","KEBS Verified","Nairobi, Kenya"].map(b => (
+              <span key={b} style={{ background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:6, padding:"4px 12px", fontSize:11, color:"#8A96A8", fontWeight:600 }}>{b}</span>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
