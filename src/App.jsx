@@ -419,6 +419,17 @@ function HomePage({ onSignup, onLogin }) {
   const A = "https://wa.me/254107129273";
   const ADDRESS_LINE = "HG 66A, Tabere Close, Kileleshwa, Nairobi";
   const MAPS_URL = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent("HG 66A, Tabere Close, Kileleshwa, Nairobi, Kenya");
+  const SERVICE_PAGES = {
+    "Product Sourcing":"/china-sourcing-agent-kenya/", "Sea Freight":"/sea-freight-china-kenya/",
+    "Air Freight":"/air-freight-china-kenya/", "Customs Clearance":"/customs-clearance-nairobi/",
+    "Last-Mile Delivery":"/china-to-kenya-shipping/",
+  };
+  const CATEGORY_PAGES = {
+    "Motorcycle Parts & Accessories":"/import-auto-motorcycle-parts-china-kenya/",
+    "Auto Parts & Accessories":"/import-auto-motorcycle-parts-china-kenya/",
+    "Electronics & Gadgets":"/import-electronics-china-kenya/", "Home Appliances":"/import-electronics-china-kenya/",
+    "Construction Finishings & Fittings":"/import-construction-materials-china-kenya/",
+  };
   const FOOTER_LINKS = {
     "Product Sourcing":"/china-sourcing-agent-kenya/", "Sea Freight":"/sea-freight-china-kenya/", "Air Freight":"/air-freight-china-kenya/",
     "Customs Clearance":"/customs-clearance-nairobi/", "Export Services":"#services",
@@ -598,6 +609,7 @@ function HomePage({ onSignup, onLogin }) {
               <div style={{ fontSize:19, fontWeight:800, marginBottom:10, letterSpacing:"-0.3px" }}>{title}</div>
               <div style={{ fontSize:14, color:"#8A96A8", lineHeight:1.65 }}>{desc}</div>
               <span style={{ display:"inline-block", marginTop:16, background:"rgba(220,38,38,0.12)", border:"1px solid rgba(220,38,38,0.2)", borderRadius:20, padding:"4px 12px", fontSize:11, fontWeight:700, color:"#EF4444", letterSpacing:"0.04em", textTransform:"uppercase" }}>{tag}</span>
+              {SERVICE_PAGES[title] && <a href={SERVICE_PAGES[title]} style={{ display:"block", marginTop:14, color:"#EF4444", fontSize:13, fontWeight:700, textDecoration:"none" }}>Learn more →</a>}
             </div>
           ))}
         </div>
@@ -632,7 +644,9 @@ function HomePage({ onSignup, onLogin }) {
         <p style={{ fontSize:17, color:"#8A96A8", lineHeight:1.6, maxWidth:500, marginBottom:48 }}>We source across all categories. Minimum KES 10,000 for individual items.</p>
         <div style={{ display:"flex", flexWrap:"wrap", gap:12 }}>
           {[["🏍️","Motorcycle Parts & Accessories"],["📱","Electronics & Gadgets"],["🚰","Construction Finishings & Fittings"],["🏠","Home Appliances"],["👗","Clothing & Fashion"],["🔧","Tools & Industrial Equipment"],["🎮","Gaming & Entertainment"],["🧴","Beauty & Personal Care"],["🏋️","Fitness & Sports Gear"],["🌱","Agricultural Inputs"],["🚗","Auto Parts & Accessories"],["📦","Custom & Bulk Orders"]].map(([icon,label]) => (
-            <div key={label} className="baruk-category-pill"><span style={{ fontSize:18 }}>{icon}</span><span>{label}</span></div>
+            CATEGORY_PAGES[label]
+              ? <a key={label} href={CATEGORY_PAGES[label]} className="baruk-category-pill" style={{ textDecoration:"none", cursor:"pointer" }}><span style={{ fontSize:18 }}>{icon}</span><span>{label}</span></a>
+              : <div key={label} className="baruk-category-pill"><span style={{ fontSize:18 }}>{icon}</span><span>{label}</span></div>
           ))}
         </div>
       </div>

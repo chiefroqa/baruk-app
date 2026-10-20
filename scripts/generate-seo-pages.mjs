@@ -1,6 +1,6 @@
 // Run: node scripts/generate-seo-pages.mjs  -> writes static pages into public/ and refreshes sitemap.xml
 import { mkdirSync, writeFileSync } from "node:fs";
-const SITE = "https://baruk.co.ke", WA = "https://wa.me/254107129273", TODAY = new Date().toISOString().slice(0, 10);
+const SITE = "https://www.baruk.co.ke", WA = "https://wa.me/254107129273", TODAY = new Date().toISOString().slice(0, 10);
 const ADDR = "HG 66A, Tabere Close, Kileleshwa, Nairobi, Kenya";
 const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
 const P = [

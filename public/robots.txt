@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://baruk.co.ke/sitemap.xml
+Sitemap: https://www.baruk.co.ke/sitemap.xml
