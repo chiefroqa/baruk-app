@@ -417,7 +417,17 @@ const OrderCard = ({ order, onClick }) => (
 // ============================================================
 function HomePage({ onSignup, onLogin }) {
   const A = "https://wa.me/254107129273";
-  
+  const ADDRESS_LINE = "HG 66A, Tabere Close, Kileleshwa, Nairobi";
+  const MAPS_URL = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent("HG 66A, Tabere Close, Kileleshwa, Nairobi, Kenya");
+  const FOOTER_LINKS = {
+    "Product Sourcing":"/china-sourcing-agent-kenya/", "Sea Freight":"/sea-freight-china-kenya/", "Air Freight":"/air-freight-china-kenya/",
+    "Customs Clearance":"/customs-clearance-nairobi/", "Export Services":"#services",
+    "China to Kenya shipping":"/china-to-kenya-shipping/", "Import cost guide":"/guides/cost-of-importing-from-china-to-kenya/",
+    "Motorcycle Parts":"/import-auto-motorcycle-parts-china-kenya/", "Construction":"/import-construction-materials-china-kenya/", "Electronics":"/import-electronics-china-kenya/",
+    "Auto Parts":"/import-auto-motorcycle-parts-china-kenya/", "All categories":"#categories",
+    "About us":"#why", "How it works":"#how", "Track shipment":"#", "Contact":"#contact",
+  };
+
   return (
     <div style={{
       fontFamily: "'DM Sans', system-ui, sans-serif",
@@ -465,6 +475,9 @@ function HomePage({ onSignup, onLogin }) {
           background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);
           border-radius:20px; padding:28px 24px;
         }
+        address.baruk-contact-strip { font-style:normal; }
+        .baruk-contact-link { color:inherit; text-decoration:none; }
+        .baruk-contact-link:hover { text-decoration:underline; }
         @media(max-width:768px){
           .baruk-stats-strip { grid-template-columns:repeat(2,1fr) !important; }
           .baruk-services-grid { grid-template-columns:1fr !important; }
@@ -480,7 +493,7 @@ function HomePage({ onSignup, onLogin }) {
       `}</style>
 
       {/* ── NAV ── */}
-      <div style={{
+      <header style={{
         position:"sticky", top:0, zIndex:100,
         display:"flex", alignItems:"center", justifyContent:"space-between",
         padding:"0 5%", height:68,
@@ -492,17 +505,17 @@ function HomePage({ onSignup, onLogin }) {
           <span style={{ fontSize:20, fontWeight:900, color:"#fff", letterSpacing:"-0.5px" }}>Baruk</span>
           <span style={{ fontSize:11, color:"#DC2626", background:"rgba(220,38,38,0.12)", border:"1px solid rgba(220,38,38,0.25)", borderRadius:20, padding:"2px 10px", fontWeight:700, letterSpacing:"0.06em", textTransform:"uppercase" }}>Logistics</span>
         </div>
-        <div className="baruk-nav-links" style={{ display:"flex", gap:28, listStyle:"none" }}>
+        <nav aria-label="Main" className="baruk-nav-links" style={{ display:"flex", gap:28, listStyle:"none" }}>
           {[["#services","Services"],["#how","How it works"],["#categories","We source"],["#why","Why us"]].map(([h,l]) => (
             <a key={h} href={h} style={{ color:"#8A96A8", textDecoration:"none", fontSize:14, fontWeight:500, transition:"color 0.2s" }}
               onMouseEnter={e=>e.target.style.color="#fff"} onMouseLeave={e=>e.target.style.color="#8A96A8"}>{l}</a>
           ))}
-        </div>
+        </nav>
         <div style={{ display:"flex", gap:8 }}>
           <button onClick={onLogin} style={{ padding:"8px 18px", background:"transparent", border:"1px solid rgba(255,255,255,0.18)", borderRadius:9, color:"#fff", fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>Sign In</button>
           <button onClick={onSignup} className="baruk-btn-primary" style={{ padding:"9px 20px", fontSize:14 }}>Get Started</button>
         </div>
-      </div>
+      </header>
 
       {/* ── HERO ── */}
       <div style={{ minHeight:"calc(100vh - 68px)", display:"flex", flexDirection:"column", justifyContent:"center", padding:"80px 5% 60px", position:"relative", overflow:"hidden" }}>
@@ -523,8 +536,8 @@ function HomePage({ onSignup, onLogin }) {
           </div>
 
           <h1 className="baruk-hero-h1" style={{ fontSize:"clamp(44px,7vw,92px)", fontWeight:900, lineHeight:1.0, letterSpacing:"-2px", marginBottom:24 }}>
-            Move cargo<br/>
-            <span style={{ color:"#DC2626" }}>anywhere.</span><br/>
+            Import from China<br/>
+            <span style={{ color:"#DC2626" }}>to Kenya.</span><br/>
             <span style={{ WebkitTextStroke:"1.5px rgba(255,255,255,0.2)", color:"transparent" }}>Effortlessly.</span>
           </h1>
 
@@ -673,22 +686,24 @@ function HomePage({ onSignup, onLogin }) {
       </div>
 
       {/* ── CONTACT STRIP ── */}
-      <div className="baruk-contact-strip" style={{ background:"#0E1525", borderTop:"1px solid rgba(255,255,255,0.07)", borderBottom:"1px solid rgba(255,255,255,0.07)", padding:"28px 5%", display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:20 }}>
+      <address id="contact" className="baruk-contact-strip" style={{ background:"#0E1525", borderTop:"1px solid rgba(255,255,255,0.07)", borderBottom:"1px solid rgba(255,255,255,0.07)", padding:"28px 5%", display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:20 }}>
         {[
-          ["📱","WhatsApp","+254 107 129 273"],
-          ["✉️","Email","cargo@baruk.co.ke"],
-          ["📍","Based in","Nairobi, Kenya"],
-          ["⏰","Response time","Within 2 hours"],
-        ].map(([icon,label,val]) => (
+          ["📱","WhatsApp","+254 107 129 273", A],
+          ["✉️","Email","info@baruk.co.ke", "mailto:info@baruk.co.ke"],
+          ["📍","Visit us",ADDRESS_LINE, MAPS_URL],
+          ["⏰","Response time","Within 2 hours", null],
+        ].map(([icon,label,val,href]) => (
           <div key={label} style={{ display:"flex", alignItems:"center", gap:12 }}>
             <span style={{ fontSize:22 }}>{icon}</span>
             <div>
               <div style={{ fontSize:11, color:"#8A96A8", fontWeight:600, textTransform:"uppercase", letterSpacing:"0.06em" }}>{label}</div>
-              <div style={{ fontSize:15, fontWeight:700, color:"#fff" }}>{val}</div>
+              <div style={{ fontSize:15, fontWeight:700, color:"#fff" }}>
+                {href ? <a className="baruk-contact-link" href={href} {...(href.startsWith("http") ? { target:"_blank", rel:"noreferrer" } : {})}>{val}</a> : val}
+              </div>
             </div>
           </div>
         ))}
-      </div>
+      </address>
 
       {/* ── CTA ── */}
       <div style={{ background:"#DC2626", padding:"88px 5%", textAlign:"center" }}>
@@ -706,7 +721,7 @@ function HomePage({ onSignup, onLogin }) {
       </div>
 
       {/* ── FOOTER ── */}
-      <div style={{ background:"#060911", padding:"56px 5% 28px", borderTop:"1px solid rgba(255,255,255,0.06)" }}>
+      <footer style={{ background:"#060911", padding:"56px 5% 28px", borderTop:"1px solid rgba(255,255,255,0.06)" }}>
         <div className="baruk-footer-grid" style={{ display:"grid", gridTemplateColumns:"2fr 1fr 1fr 1fr", gap:40, marginBottom:40 }}>
           <div>
             <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
@@ -714,29 +729,35 @@ function HomePage({ onSignup, onLogin }) {
               <span style={{ fontSize:19, fontWeight:900, color:"#fff" }}>Baruk</span>
             </div>
             <p style={{ fontSize:14, color:"#8A96A8", lineHeight:1.7, maxWidth:260 }}>End-to-end import and export logistics for Kenyan businesses and individuals. Source it. Ship it. Delivered.</p>
+            <address style={{ fontStyle:"normal", fontSize:14, color:"#8A96A8", lineHeight:1.7, marginTop:14 }}>
+              <strong style={{ color:"#fff" }}>Baruk Logistics</strong><br/>
+              HG 66A, Tabere Close<br/>
+              Kileleshwa, Nairobi, Kenya<br/>
+              <a href={MAPS_URL} target="_blank" rel="noreferrer" style={{ color:"#EF4444", textDecoration:"none", fontWeight:600 }}>Get directions →</a>
+            </address>
           </div>
           {[
             ["Services",["Product Sourcing","Sea Freight","Air Freight","Customs Clearance","Export Services"]],
             ["We Source",["Motorcycle Parts","Construction","Electronics","Auto Parts","All categories"]],
-            ["Company",["About us","How it works","Track shipment","Contact"]],
+            ["Company",["About us","How it works","China to Kenya shipping","Import cost guide","Contact"]],
           ].map(([title,links]) => (
             <div key={title}>
               <div style={{ fontSize:12, fontWeight:700, color:"#fff", textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:16 }}>{title}</div>
               <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-                {links.map(l => <a key={l} href="#" style={{ color:"#8A96A8", textDecoration:"none", fontSize:14, transition:"color 0.2s" }} onMouseEnter={e=>e.target.style.color="#fff"} onMouseLeave={e=>e.target.style.color="#8A96A8"}>{l}</a>)}
+                {links.map(l => <a key={l} href={FOOTER_LINKS[l] || "#"} style={{ color:"#8A96A8", textDecoration:"none", fontSize:14, transition:"color 0.2s" }} onMouseEnter={e=>e.target.style.color="#fff"} onMouseLeave={e=>e.target.style.color="#8A96A8"}>{l}</a>)}
               </div>
             </div>
           ))}
         </div>
         <div style={{ borderTop:"1px solid rgba(255,255,255,0.07)", paddingTop:24, display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:12 }}>
-          <div style={{ fontSize:13, color:"#8A96A8" }}>© 2025 Baruk Logistics. All rights reserved.</div>
+          <div style={{ fontSize:13, color:"#8A96A8" }}>© {new Date().getFullYear()} Baruk Logistics. All rights reserved.</div>
           <div style={{ display:"flex", gap:8 }}>
-            {["KRA Compliant","KEBS Verified","Nairobi, Kenya"].map(b => (
+            {["KRA Compliant","KEBS Verified","Kileleshwa, Nairobi"].map(b => (
               <span key={b} style={{ background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:6, padding:"4px 12px", fontSize:11, color:"#8A96A8", fontWeight:600 }}>{b}</span>
             ))}
           </div>
         </div>
-      </div>
+      </footer>
     </div>
   );
 }
@@ -1167,7 +1188,10 @@ function InstallBanner() {
 // ============================================================
 export default function App() {
   const [user, setUser]             = useState(null);
-  const [authView, setAuthView]     = useState("home");
+  const [authView, setAuthView]     = useState(() => {
+    const q = new URLSearchParams(window.location.search);
+    return q.has("signup") ? "signup" : q.has("login") ? "login" : "home";
+  });
   const [appLoading, setAppLoading] = useState(true);
   const [orders, setOrders]         = useState([]);
   const [logs, setLogs]             = useState([]);
